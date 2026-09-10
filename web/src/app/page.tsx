@@ -47,7 +47,6 @@ const habits = [
 ];
 
 export default function LandingPage() {
-
   return (
     <main
       className={`${fraunces.variable} ${inter.variable} relative min-h-screen w-full overflow-hidden bg-[#faf5ec] font-sans text-[#2c2115]`}
@@ -62,7 +61,7 @@ export default function LandingPage() {
         <nav className="flex items-center justify-between border-b border-[#2c2115]/15 pb-6">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#a4522f]">
             <span className="size-2 rounded-full bg-[#c96f4a]" />
-          IPON Ledger
+            IPON Ledger
           </div>
           <Link
             href="/tracker"
@@ -135,15 +134,18 @@ export default function LandingPage() {
           </h2>
           <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {habits.map((habit) => (
-              <li key={habit} className="flex items-start gap-3 text-sm text-[#2c2115]">
+              <li
+                key={habit}
+                className="flex items-start gap-3 text-sm text-[#2c2115]"
+              >
                 <span className="mt-1.5 size-2 shrink-0 rounded-full bg-[#c96f4a]" />
                 {habit}
               </li>
             ))}
           </ul>
           <p className="mt-6 text-sm leading-relaxed text-[#6d4f3c]">
-            None of these require a higher salary. They require visibility —
-            and that&apos;s exactly what a monthly budget gives you.
+            None of these require a higher salary. They require visibility — and
+            that&apos;s exactly what a monthly budget gives you.
           </p>
         </section>
 
