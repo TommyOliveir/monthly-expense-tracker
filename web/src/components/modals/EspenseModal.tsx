@@ -1,6 +1,6 @@
 import React, { FC } from "react";
 
-export interface ExpenseFormState {
+interface ExpenseFormState {
   name: string;
   amount: string; // CHANGED: Set to string to match parent component state
   category: string;
