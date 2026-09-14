@@ -5,10 +5,14 @@ import { UsersModule } from './users/users.module';
 import { ExpenseService } from './expense/expense.service';
 import { ExpenseController } from './expense/expense.controller';
 import { ExpenseModule } from './expense/expense.module';
+import { PrismaService } from './prisma/prisma.service';
+import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './auth/auth.module';
+import { UserModule } from './user/user.module';
 
 @Module({
-  imports: [UsersModule, ExpenseModule],
+  imports: [UsersModule, ExpenseModule, PrismaModule, AuthModule, UserModule],
   controllers: [AppController, ExpenseController],
-  providers: [AppService, ExpenseService],
+  providers: [AppService, ExpenseService, PrismaService],
 })
 export class AppModule {}
