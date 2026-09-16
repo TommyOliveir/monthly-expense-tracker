@@ -113,7 +113,6 @@ export default function Tracker() {
 
   // Budget
   const [budget, setBudget] = useState(8000);
-  const [budgetInput, setBudgetInput] = useState("8000");
 
   const handleSaveBudget = (newBudget: number) => {
     setBudget(newBudget);
@@ -224,7 +223,6 @@ export default function Tracker() {
 
       if (!Number.isNaN(parsedBudget) && parsedBudget > 0) {
         setBudget(parsedBudget);
-        setBudgetInput(String(parsedBudget));
       }
     }
 
@@ -287,7 +285,6 @@ export default function Tracker() {
    * Open budget modal
    */
   function openBudgetModal() {
-    setBudgetInput(String(budget));
     setIsBudgetModalOpen(true);
   }
 
