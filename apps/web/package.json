@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
+    "@tanstack/react-query": "^5.103.2",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.2.6",
     "knip": "^6.35.1",
@@ -25,6 +26,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tanstack/react-query-devtools": "^5.103.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

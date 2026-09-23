@@ -7,6 +7,17 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // 1. Configure CORS
+  app.enableCors({
+    origin: [
+      'http://localhost:3000', // Local Next.js dev server
+      process.env.FRONTEND_URL || '', // Deployed Next.js URL on Vercel/Render
+    ].filter(Boolean),
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true, // Allows authorization headers / cookies
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
   // Validation
   app.useGlobalPipes(
     new ValidationPipe({
@@ -21,6 +32,7 @@ async function bootstrap() {
     .setTitle('My API')
     .setDescription('API documentation')
     .setVersion('1.0')
+    .addBearerAuth() // 👈 Adds JWT Authorization button in Swagger UI
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

@@ -130,6 +130,7 @@ import {
   Check,
   X,
 } from "lucide-react";
+import { useLogin } from "../../../features/auth/hooks/useLogin";
 
 export default function AuthPage() {
   const [authMode, setAuthMode] = useState("login"); // 'login' | 'register'
@@ -137,6 +138,8 @@ export default function AuthPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+
+  const { login } = useLogin();
 
   // Form State
   const [formData, setFormData] = useState({
@@ -236,7 +239,12 @@ export default function AuthPage() {
           password: formData.password,
           submittedAt: new Date().toISOString(),
         });
+        login({
+          email: formData.email,
+          password: formData.password,
+        });
         console.log("data", formData);
+        alert("you are login");
         showNotification(
           `Welcome back! Successfully authenticated as ${formData.email}.`,
         );
