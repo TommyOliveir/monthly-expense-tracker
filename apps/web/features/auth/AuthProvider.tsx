@@ -15,6 +15,7 @@ import type {
   ILoginResponse,
   IUser,
   LoginPayload,
+  SignUpPayload,
 } from "./types/auth";
 import { post } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
@@ -24,6 +25,7 @@ export type AuthState = {
   accessToken: string | null;
   isAuthenticated: boolean;
   login: (payload: LoginPayload) => Promise<ILoginResponse>;
+  signup: (payload: SignUpPayload) => Promise<IUser>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -75,14 +77,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const signup = useCallback(async (payload: SignUpPayload): Promise<IUser> => {
+    const newUser = await post<IUser, SignUpPayload>(
+      ENDPOINTS.auth.signup,
+      payload,
+      { requiresAuth: false },
+    );
+
+    return newUser;
+  }, []);
+
   const value = useMemo<AuthState>(
     () => ({
       user,
       accessToken: session?.accessToken ?? null,
       isAuthenticated: !!session,
       login,
+      signup,
     }),
-    [user, session, login],
+    [user, session, login, signup],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

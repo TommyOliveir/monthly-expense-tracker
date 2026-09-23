@@ -1,6 +1,6 @@
 export const ENDPOINTS = {
   auth: {
-    sendOtp: "/auth/otp/send",
+    signup: "/auth/signup",
     login: "/auth/login",
     logout: "/auth/logout",
     refresh: "/auth/refresh",

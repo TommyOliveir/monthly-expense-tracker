@@ -25,12 +25,26 @@ export class AuthService {
       throw new ConflictException('User with this email already exists');
     }
 
-    // 2. Create the new user (UserService handles hashing password via argon2)
+    // 2. Create the new user
     const newUser = await this.userService.create(createUserDto);
 
-    // 3. Exclude password hash from returned object
-    const { password, ...result } = newUser;
-    return result;
+    // 3. Create JWT payload
+    const payload = {
+      sub: newUser.id,
+      email: newUser.email,
+    };
+
+    // 4. Generate access token
+    const accessToken = await this.jwtService.signAsync(payload);
+
+    // 5. Exclude password hash from returned object
+    const { password, ...userWithoutPassword } = newUser;
+
+    // 6. Return both user and accessToken (Same shape as login response)
+    return {
+      user: userWithoutPassword,
+      accessToken,
+    };
   }
 
   async login(loginDto: LoginDto) {

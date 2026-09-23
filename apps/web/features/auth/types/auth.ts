@@ -18,3 +18,9 @@ export interface ILoginResponse {
   user: IUser;
   accessToken: string;
 }
+
+export interface ISignUpPayload {
+  name?: string;
+  email: string;
+  password: string;
+}

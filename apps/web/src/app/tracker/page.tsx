@@ -5,6 +5,7 @@ import { ExpenseModal } from "@/components/modals/EspenseModal";
 
 import { Button } from "@/components/ui/button";
 import { useCoinSound } from "@/hooks/use-coin-sound";
+import { redirect } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 type TxColor = "terracotta" | "amber" | "olive" | "clay";
