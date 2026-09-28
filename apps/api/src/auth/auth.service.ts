@@ -17,7 +17,7 @@ export class AuthService {
   ) {}
 
   async registerUser(createUserDto: CreateUserDto) {
-    // 1. Check if user already exists
+    // 1. Check if email exists
     const existingUser = await this.userService.findByEmail(
       createUserDto.email,
     );
@@ -25,7 +25,7 @@ export class AuthService {
       throw new ConflictException('User with this email already exists');
     }
 
-    // 2. Create the new user
+    // 2. Create new user (UserService handles single Argon2 hashing + category seeding)
     const newUser = await this.userService.create(createUserDto);
 
     // 3. Create JWT payload
@@ -34,13 +34,12 @@ export class AuthService {
       email: newUser.email,
     };
 
-    // 4. Generate access token
+    // 4. Generate token
     const accessToken = await this.jwtService.signAsync(payload);
 
-    // 5. Exclude password hash from returned object
+    // 5. Omit password hash from response
     const { password, ...userWithoutPassword } = newUser;
 
-    // 6. Return both user and accessToken (Same shape as login response)
     return {
       user: userWithoutPassword,
       accessToken,
@@ -48,30 +47,25 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
-    // 1. Find user
     const user = await this.userService.findByEmail(loginDto.email);
 
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    // 2. Compare password with Argon2 hash
+    // Verify plaintext login password against stored Argon2 hash
     const passwordIsValid = await verify(user.password, loginDto.password);
 
     if (!passwordIsValid) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    // 3. Create JWT payload
     const payload = {
       sub: user.id,
       email: user.email,
     };
 
-    // 4. Generate token
     const accessToken = await this.jwtService.signAsync(payload);
-
-    // 5. Don't return password
     const { password, ...userWithoutPassword } = user;
 
     return {

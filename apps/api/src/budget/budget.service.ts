@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateBudgetDto } from './dto/create-budget.dto';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -7,29 +7,115 @@ import { PrismaService } from 'src/prisma/prisma.service';
 export class BudgetService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(createBudgetDto: CreateBudgetDto, userId: string) {
-    return this.prisma.budget.create({
-      data: {
-        amount: createBudgetDto.amount,
-        month: createBudgetDto.month,
-        year: createBudgetDto.year,
+  async createOrUpdate(createBudgetDto: CreateBudgetDto, userId: string) {
+    const { amount, month, year } = createBudgetDto;
+
+    return this.prisma.budget.upsert({
+      where: {
+        userId_year_month: {
+          userId,
+          year,
+          month,
+        },
+      },
+      update: {
+        amount,
+      },
+      create: {
+        amount,
+        year,
+        month,
         userId,
       },
     });
   }
-  findAll() {
-    return `This action returns all budget`;
+
+  async getMonthlySummary(userId: string, month: number, year: number) {
+    // 1. Fetch Budget target for the month
+    const budget = await this.prisma.budget.findUnique({
+      where: {
+        userId_year_month: { userId, year, month },
+      },
+    });
+
+    // 2. Fetch all Expenses for the month with category details
+    const expenses = await this.prisma.expense.findMany({
+      where: { userId, year, month },
+      include: { category: true },
+      orderBy: { date: 'desc' },
+    });
+
+    // 3. Calculate total spending
+    const totalSpent = expenses.reduce(
+      (sum, expense) => sum + Number(expense.amount),
+      0,
+    );
+
+    const budgetAmount = budget ? Number(budget.amount) : 0;
+    const remaining = budgetAmount - totalSpent;
+
+    return {
+      budget: budgetAmount,
+      totalSpent,
+      remaining,
+      month,
+      year,
+      expenses: expenses.map((e) => ({
+        ...e,
+        amount: Number(e.amount),
+      })),
+    };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} budget`;
+  ///////////////////////////////////
+
+  async findAllForUser(userId: string) {
+    return this.prisma.budget.findMany({
+      where: { userId },
+      orderBy: [{ year: 'desc' }, { month: 'desc' }],
+    });
   }
 
-  update(id: number, updateBudgetDto: UpdateBudgetDto) {
-    return `This action updates a #${id} budget`;
+  async findByMonthAndYear(userId: string, month: number, year: number) {
+    const budget = await this.prisma.budget.findUnique({
+      where: {
+        userId_year_month: {
+          userId,
+          year,
+          month,
+        },
+      },
+    });
+
+    return budget || { amount: 0, year, month, userId };
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} budget`;
+  async update(id: string, updateBudgetDto: UpdateBudgetDto, userId: string) {
+    const budget = await this.prisma.budget.findFirst({
+      where: { id, userId },
+    });
+
+    if (!budget) {
+      throw new NotFoundException('Budget not found');
+    }
+
+    return this.prisma.budget.update({
+      where: { id },
+      data: updateBudgetDto,
+    });
+  }
+
+  async remove(id: string, userId: string) {
+    const budget = await this.prisma.budget.findFirst({
+      where: { id, userId },
+    });
+
+    if (!budget) {
+      throw new NotFoundException('Budget not found');
+    }
+
+    return this.prisma.budget.delete({
+      where: { id },
+    });
   }
 }

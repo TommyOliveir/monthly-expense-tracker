@@ -8,12 +8,44 @@ export class UserService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto) {
-    const { password, ...user } = createUserDto;
+    const { password, ...userData } = createUserDto;
+
+    // Hash plaintext password ONCE
     const hashedPassword = await hash(password);
-    return await this.prisma.user.create({
+
+    return this.prisma.user.create({
       data: {
+        ...userData,
         password: hashedPassword,
-        ...user,
+        // Seed default categories directly for the new user
+        categories: {
+          create: [
+            {
+              name: 'Markets & dining',
+              color: '#c96f4a',
+              initial: 'G',
+              isDefault: true,
+            },
+            {
+              name: 'Subscriptions',
+              color: '#d99a3d',
+              initial: 'S',
+              isDefault: true,
+            },
+            {
+              name: 'Housing',
+              color: '#7d8c5c',
+              initial: 'U',
+              isDefault: true,
+            },
+            {
+              name: 'Transport',
+              color: '#8c6a54',
+              initial: 'T',
+              isDefault: true,
+            },
+          ],
+        },
       },
     });
   }
@@ -23,19 +55,4 @@ export class UserService {
       where: { email },
     });
   }
-  // findAll() {
-  //   return `This action returns all user`;
-  // }
-
-  // findOne(id: number) {
-  //   return `This action returns a #${id} user`;
-  // }
-
-  // update(id: number, updateUserDto: UpdateUserDto) {
-  //   return `This action updates a #${id} user`;
-  // }
-
-  // remove(id: number) {
-  //   return `This action removes a #${id} user`;
-  // }
 }

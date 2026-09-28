@@ -1,7 +1,9 @@
-import { IsInt, IsNumber, IsString, Max, Min } from 'class-validator';
+import { IsNumber, IsInt, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateBudgetDto {
   @IsNumber()
+  @Type(() => Number)
   amount: number;
 
   @IsInt()
@@ -11,7 +13,4 @@ export class CreateBudgetDto {
 
   @IsInt()
   year: number;
-
-  @IsString()
-  userId: string;
 }

@@ -1,40 +1,59 @@
 import React, { useState } from "react";
+import { useSetBudget } from "../../../features/budget/hooks/useSetBudget";
 
 export interface BudgetModalProps {
   /** Controls modal visibility */
   isOpen: boolean;
   /** Function to close the modal */
   onClose: () => void;
-  /** Callback triggered when the new budget is submitted */
-  onSave: (newBudget: number) => void;
   /** The currently active monthly budget */
   currentBudget: number;
   /** The total amount spent so far */
   totalSpent: number;
-  /** Helper to format currency values (e.g., (val) => `$${val.toLocaleString()}`) */
+  /** Helper to format currency values */
   formatCurrency?: (value: number) => string;
 }
 
 export const BudgetModal: React.FC<BudgetModalProps> = ({
   isOpen,
   onClose,
-  onSave,
   currentBudget,
   totalSpent,
   formatCurrency = (val) => `$${val.toFixed(2)}`,
 }) => {
+  const { setBudget, isSettingBudget, setBudgetError } = useSetBudget();
+
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const minMonthString = `${currentYear}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`;
+
   const [budgetInput, setBudgetInput] = useState<string>(
     currentBudget > 0 ? currentBudget.toString() : "",
   );
+  const [selectedMonthYear, setSelectedMonthYear] =
+    useState<string>(minMonthString);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const numericValue = parseFloat(budgetInput);
-    if (!isNaN(numericValue) && numericValue > 0) {
-      onSave(numericValue);
-      onClose();
+
+    if (!isNaN(numericValue) && numericValue > 0 && selectedMonthYear) {
+      const [yearStr, monthStr] = selectedMonthYear.split("-");
+
+      setBudget(
+        {
+          amount: numericValue,
+          year: parseInt(yearStr, 10),
+          month: parseInt(monthStr, 10),
+        },
+        {
+          onSuccess: () => {
+            onClose();
+          },
+        },
+      );
     }
   };
 
@@ -53,11 +72,34 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
             Set monthly budget
           </h2>
           <p className="mt-1 text-sm text-[#8a7a63]">
-            How much would you like to spend this month?
+            Select target month and budget amount.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+          {/* Target Month & Year Input */}
+          <div>
+            <label
+              htmlFor="target-month"
+              className="block text-xs font-semibold uppercase tracking-[0.15em] text-[#8a7a63]"
+            >
+              Target Month & Year
+            </label>
+            <input
+              id="target-month"
+              type="month"
+              min={minMonthString}
+              value={selectedMonthYear}
+              onChange={(e) => setSelectedMonthYear(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-[#2c2115]/20 bg-[#faf5ec] px-4 py-3 text-sm text-[#2c2115] outline-none transition focus:border-[#c96f4a] focus:ring-2 focus:ring-[#c96f4a]/25"
+              required
+            />
+            <p className="mt-1 text-xs text-[#8a7a63]">
+              Past months cannot be modified.
+            </p>
+          </div>
+
+          {/* Budget Input */}
           <div>
             <label
               htmlFor="budget"
@@ -102,20 +144,29 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
             </div>
           </div>
 
+          {/* Error Message */}
+          {setBudgetError && (
+            <p className="text-xs font-medium text-red-600">
+              Failed to update budget. Please try again.
+            </p>
+          )}
+
           <div className="flex gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-full border border-[#2c2115]/20 px-4 py-2.5 text-sm font-semibold text-[#2c2115] transition hover:bg-[#2c2115]/5"
+              disabled={isSettingBudget}
+              className="flex-1 rounded-full border border-[#2c2115]/20 px-4 py-2.5 text-sm font-semibold text-[#2c2115] transition hover:bg-[#2c2115]/5 disabled:opacity-50"
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              className="flex-1 rounded-full bg-[#2c2115] px-4 py-2.5 text-sm font-semibold text-[#faf5ec] transition hover:bg-[#c96f4a]"
+              disabled={isSettingBudget}
+              className="flex-1 rounded-full bg-[#2c2115] px-4 py-2.5 text-sm font-semibold text-[#faf5ec] transition hover:bg-[#c96f4a] disabled:opacity-50"
             >
-              Save budget
+              {isSettingBudget ? "Saving..." : "Save budget"}
             </button>
           </div>
         </form>

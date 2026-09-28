@@ -6,14 +6,9 @@ export const ENDPOINTS = {
     refresh: "/auth/refresh",
     me: "/auth/me",
   },
-  posts: {
-    list: "/posts",
-    slug: "/posts/slug/",
-    create: "/posts",
-    update: (id: string) => `/posts/${id}`,
-    delete: (id: string) => `/posts/${id}`,
-    uploadImage: "/upload/image",
-    mine: "/posts/mine",
+  budget: {
+    summary: "/budget/summary",
+    set: "/budget",
   },
   categories: {
     list: "/categories",
