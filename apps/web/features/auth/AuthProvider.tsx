@@ -5,13 +5,12 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
 
-import { getTokens, setTokens } from "./tokenStore";
 import type {
-  AuthTokens,
   ILoginResponse,
   IUser,
   LoginPayload,
@@ -19,6 +18,12 @@ import type {
 } from "./types/auth";
 import { post } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
+import {
+  clearTokens,
+  getTokens,
+  setTokens,
+  subscribeToTokens,
+} from "./tokenStore";
 
 export type AuthState = {
   user: IUser | null;
@@ -26,28 +31,47 @@ export type AuthState = {
   isAuthenticated: boolean;
   login: (payload: LoginPayload) => Promise<ILoginResponse>;
   signup: (payload: SignUpPayload) => Promise<IUser>;
+  logout: () => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<IUser | null>(() => {
-    const stored = localStorage.getItem("user");
+  const [user, setUser] = useState<IUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(
+    () => getTokens()?.accessToken ?? null,
+  );
 
-    if (!stored) {
-      return null;
+  // Sync React state directly with tokenManager updates
+  useEffect(() => {
+    // Hydrate tokens and user state on mount (client-side)
+    const initialTokens = getTokens();
+    if (initialTokens) {
+      setAccessToken(initialTokens.accessToken);
     }
 
-    try {
-      return JSON.parse(stored) as IUser;
-    } catch {
-      localStorage.removeItem("user");
-      return null;
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem("user");
+      }
     }
-  });
 
-  const [session, setSession] = useState<AuthTokens | null>(() => getTokens());
+    // Subscribe to token changes (e.g., login, logout, refresh, cross-tab changes)
+    const unsubscribe = subscribeToTokens((newTokens) => {
+      setAccessToken(newTokens?.accessToken ?? null);
+      if (!newTokens) {
+        setUser(null);
+        localStorage.removeItem("user");
+      }
+    });
 
+    return unsubscribe;
+  }, []);
+
+  // Login handler using tokenManager
   const login = useCallback(
     async (payload: LoginPayload): Promise<ILoginResponse> => {
       const res = await post<ILoginResponse, LoginPayload>(
@@ -57,14 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
 
       if (res?.accessToken) {
-        const tokens: AuthTokens = {
+        // Save tokens in tokenManager (handles both accessToken and optional refreshToken)
+        setTokens({
           accessToken: res.accessToken,
-          refreshToken: res.refreshToken ?? "",
-        };
-
-        // Save to token store and local state
-        setTokens(tokens);
-        setSession(tokens);
+          refreshToken: res.refreshToken ?? null,
+        });
 
         if (res.user) {
           setUser(res.user);
@@ -77,25 +98,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const signup = useCallback(async (payload: SignUpPayload): Promise<IUser> => {
-    const newUser = await post<IUser, SignUpPayload>(
-      ENDPOINTS.auth.signup,
-      payload,
-      { requiresAuth: false },
-    );
+  // Logout handler clearing tokenManager
+  const logout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem("user");
+    clearTokens(); // Resets token state and clears localStorage automatically
+  }, []);
 
-    return newUser;
+  // Signup handler
+  const signup = useCallback(async (payload: SignUpPayload): Promise<IUser> => {
+    return await post<IUser, SignUpPayload>(ENDPOINTS.auth.signup, payload, {
+      requiresAuth: false,
+    });
   }, []);
 
   const value = useMemo<AuthState>(
     () => ({
       user,
-      accessToken: session?.accessToken ?? null,
-      isAuthenticated: !!session,
+      accessToken,
+      isAuthenticated: Boolean(accessToken),
       login,
       signup,
+      logout,
     }),
-    [user, session, login, signup],
+    [user, accessToken, login, signup, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

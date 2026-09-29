@@ -11,7 +11,10 @@ export const ENDPOINTS = {
     set: "/budget",
   },
   categories: {
-    list: "/categories",
+    list: "/category",
+    create: "/category",
+    update: (id: string) => `/category/${id}`,
+    delete: (id: string) => `/category/delete/${id}`,
   },
   tags: {
     list: "/tags",

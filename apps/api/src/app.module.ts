@@ -10,9 +10,10 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { BudgetModule } from './budget/budget.module';
+import { CategoryModule } from './category/category.module';
 
 @Module({
-  imports: [UsersModule, ExpenseModule, PrismaModule, AuthModule, UserModule, BudgetModule],
+  imports: [UsersModule, ExpenseModule, PrismaModule, AuthModule, UserModule, BudgetModule, CategoryModule],
   controllers: [AppController, ExpenseController],
   providers: [AppService, ExpenseService, PrismaService],
 })

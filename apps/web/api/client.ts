@@ -1,7 +1,8 @@
 import { API_BASE_URL } from "@/config";
 import { HTTP_STATUS } from "./httpCode";
 import { ENDPOINTS } from "./endpoints";
-import { getTokens } from "../features/auth/tokenStore";
+import { clearTokens, getTokens, setTokens } from "../features/auth/tokenStore";
+import { AuthTokens } from "../features/auth/types/auth";
 
 type RequestOptions = RequestInit & {
   requiresAuth?: boolean;

@@ -5,6 +5,10 @@ type TokenListener = (tokens: AuthTokens | null) => void;
 const STORAGE_KEY = "session";
 
 function getInitialTokens(): AuthTokens | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
   const storedToken = localStorage.getItem(STORAGE_KEY);
 
   if (!storedToken) {
@@ -75,7 +79,9 @@ export function setTokens(newTokens: AuthTokens): void {
 
   tokens = newTokens;
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newTokens));
+  if (typeof window !== "undefined") {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newTokens));
+  }
 
   listeners.forEach((listener) => {
     listener(tokens);
@@ -89,7 +95,9 @@ export function clearTokens(): void {
 
   tokens = null;
 
-  localStorage.removeItem(STORAGE_KEY);
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(STORAGE_KEY);
+  }
 
   listeners.forEach((listener) => {
     listener(null);

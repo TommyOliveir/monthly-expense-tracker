@@ -6,12 +6,13 @@ import { ExpenseModal } from "@/components/modals/EspenseModal";
 import { Button } from "@/components/ui/button";
 import { useCoinSound } from "@/hooks/use-coin-sound";
 import { useEffect, useMemo, useState } from "react";
-import { useBudgetSummary } from "../../../features/budget/hooks/useBudgetSummary";
 import { useAuth } from "../../../features/auth/AuthProvider";
+import { useBudgetSummary } from "../../../features/budget/hooks/useBudgetSummary";
+import { useCategories } from "../../../features/category/hooks/useCategories";
 
-type TxColor = "terracotta" | "amber" | "olive" | "clay";
+export type TxColor = "terracotta" | "amber" | "olive" | "clay";
 
-type Transaction = {
+export type Transaction = {
   id: string;
   name: string;
   category: string;
@@ -20,10 +21,8 @@ type Transaction = {
   method: string;
   initial: string;
   color: TxColor;
-  monthYear: string; // Stored as "YYYY-MM"
+  monthYear: string;
 };
-
-type CategoryMeta = { color: TxColor; initial: string };
 
 const colorClasses: Record<TxColor, string> = {
   terracotta: "bg-[#c96f4a]/12 text-[#a4522f]",
@@ -39,20 +38,25 @@ const barClasses: Record<TxColor, string> = {
   clay: "bg-[#8c6a54]",
 };
 
-// Order in which new categories get colors assigned
 const colorCycle: TxColor[] = ["terracotta", "amber", "olive", "clay"];
-
-const defaultCategoryMeta: Record<string, CategoryMeta> = {
-  "Markets & dining": { color: "terracotta", initial: "G" },
-  Subscriptions: { color: "amber", initial: "S" },
-  Housing: { color: "olive", initial: "U" },
-  Transport: { color: "clay", initial: "T" },
-};
 
 const getCurrentMonthKey = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
+
+function getCategoryMeta(categoryName: string, index = 0) {
+  const color = colorCycle[index % colorCycle.length];
+  const initial = categoryName.charAt(0).toUpperCase() || "C";
+  return { color, initial };
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(value);
+}
 
 const initialSeedTransactions: Transaction[] = [
   {
@@ -62,7 +66,7 @@ const initialSeedTransactions: Transaction[] = [
     date: "Sun, Mar 2",
     amount: 86.4,
     method: "Debit ···· 4821",
-    initial: "G",
+    initial: "M",
     color: "terracotta",
     monthYear: getCurrentMonthKey(),
   },
@@ -84,184 +88,52 @@ const initialSeedTransactions: Transaction[] = [
     date: "Thu, Mar 6",
     amount: 1450,
     method: "Transfer",
-    initial: "U",
+    initial: "H",
     color: "olive",
-    monthYear: getCurrentMonthKey(),
-  },
-  {
-    id: "4",
-    name: "Coffee & croissant",
-    category: "Markets & dining",
-    date: "Sat, Mar 8",
-    amount: 14.2,
-    method: "Debit ···· 4821",
-    initial: "C",
-    color: "terracotta",
     monthYear: getCurrentMonthKey(),
   },
 ];
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(value);
-}
-
 export default function Tracker() {
+  const { user } = useAuth();
+  const { playCoin } = useCoinSound();
+  const { categories } = useCategories();
+
+  const [selectedMonthYear, setSelectedMonthYear] =
+    useState<string>(getCurrentMonthKey());
+
+  const [selectedYear, selectedMonth] = useMemo(() => {
+    const [y, m] = selectedMonthYear.split("-").map(Number);
+    return [y || new Date().getFullYear(), m || new Date().getMonth() + 1];
+  }, [selectedMonthYear]);
+
+  // Fetch backend data
+  const { budgetSummary, isBudgetSummaryLoading } = useBudgetSummary({
+    month: selectedMonth,
+    year: selectedYear,
+  });
+
   const [transactions, setTransactions] = useState<Transaction[]>(
     initialSeedTransactions,
   );
 
-  const { user } = useAuth();
-
-  console.log("user", user);
-
-  const currentMonthKey = getCurrentMonthKey();
-
-  // Selected month state (Format: "YYYY-MM")
-  const [selectedMonthYear, setSelectedMonthYear] =
-    useState<string>(currentMonthKey);
-
-  // Parse selected month & year for API hook dynamically
-  const [selectedYear, selectedMonth] = useMemo(() => {
-    const [y, m] = selectedMonthYear.split("-").map(Number);
-    return [y || 2026, m || 3];
-  }, [selectedMonthYear]);
-
-  // Fetch summary from backend
-  const { budgetSummary, isBudgetSummaryLoading, budgetSummaryError } =
-    useBudgetSummary({
-      month: selectedMonth,
-      year: selectedYear,
-    });
-
-  // Extract budget with API fallback
-  const budget = budgetSummary?.budget ?? 8000;
-
-  // Categories — stateful so users can add their own
-  const [categoryMeta, setCategoryMeta] =
-    useState<Record<string, CategoryMeta>>(defaultCategoryMeta);
-
-  // Modals
+  // Modals & Forms
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
-
-  const handleSaveBudget = (newBudget: number) => {
-    localStorage.setItem("ipon-budget", String(newBudget));
-  };
-
-  // Expense form
   const [form, setForm] = useState({
     name: "",
     amount: "",
-    category: "Markets & dining",
+    category: categories[0]?.name || "Markets & dining",
   });
-
-  function persistCustomCategories(categories: Record<string, CategoryMeta>) {
-    const custom: Record<string, CategoryMeta> = {};
-    for (const key of Object.keys(categories)) {
-      if (!defaultCategoryMeta[key]) {
-        custom[key] = categories[key];
-      }
-    }
-    localStorage.setItem("ipon-categories", JSON.stringify(custom));
-  }
-
-  function addCategory(name: string) {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-
-    setCategoryMeta((prev) => {
-      if (prev[trimmed]) return prev;
-
-      const nextMeta: CategoryMeta = {
-        color: colorCycle[Object.keys(prev).length % colorCycle.length],
-        initial: trimmed.charAt(0).toUpperCase(),
-      };
-
-      const updated = { ...prev, [trimmed]: nextMeta };
-      persistCustomCategories(updated);
-      return updated;
-    });
-  }
-
-  function editCategory(oldName: string, newName: string) {
-    const trimmedNew = newName.trim();
-    if (!trimmedNew || oldName === trimmedNew || defaultCategoryMeta[oldName]) {
-      return;
-    }
-
-    setCategoryMeta((prev) => {
-      if (!prev[oldName]) return prev;
-
-      const meta = prev[oldName];
-      const updated = { ...prev };
-      delete updated[oldName];
-
-      updated[trimmedNew] = {
-        ...meta,
-        initial: trimmedNew.charAt(0).toUpperCase(),
-      };
-
-      persistCustomCategories(updated);
-      return updated;
-    });
-
-    setTransactions((prev) =>
-      prev.map((tx) =>
-        tx.category === oldName ? { ...tx, category: trimmedNew } : tx,
-      ),
-    );
-  }
-
-  function deleteCategory(name: string) {
-    if (defaultCategoryMeta[name]) return;
-
-    setCategoryMeta((prev) => {
-      const updated = { ...prev };
-      delete updated[name];
-      persistCustomCategories(updated);
-      return updated;
-    });
-
-    setTransactions((prev) =>
-      prev.map((tx) =>
-        tx.category === name ? { ...tx, category: "Markets & dining" } : tx,
-      ),
-    );
-  }
-
-  useEffect(() => {
-    const savedCategories = localStorage.getItem("ipon-categories");
-
-    if (savedCategories) {
-      try {
-        const parsed = JSON.parse(savedCategories) as Record<
-          string,
-          CategoryMeta
-        >;
-        setCategoryMeta((prev) => ({ ...prev, ...parsed }));
-      } catch {
-        // ignore corrupt data
-      }
-    }
-  }, []);
-
-  /*
-   * Dynamic spending calculation reading directly from budgetSummary backend response
-   */
+  // Calculate totals and category breakdown
   const { totalSpent, breakdown, topCategory } = useMemo(() => {
-    // Prefer backend expenses array if returned, otherwise fallback to local seed
-    const expensesList = budgetSummary?.expenses ?? transactions;
-
+    const list = budgetSummary?.expenses ?? transactions;
     const total =
       budgetSummary?.totalSpent ??
-      expensesList.reduce((sum, t) => sum + (t.amount || 0), 0);
+      list.reduce((sum, t) => sum + (t.amount || 0), 0);
 
     const map = new Map<string, number>();
-
-    for (const t of expensesList) {
+    for (const t of list) {
       if (!t.category) continue;
       map.set(t.category, (map.get(t.category) ?? 0) + (t.amount || 0));
     }
@@ -275,42 +147,31 @@ export default function Tracker() {
     };
   }, [budgetSummary, transactions]);
 
-  /*
-   * Dynamic budget calculations
-   */
+  const budget = budgetSummary?.budget ?? 8000;
   const remaining = budgetSummary?.remaining ?? budget - totalSpent;
-
   const percentUsed =
     budget > 0 ? Math.min(100, Math.round((totalSpent / budget) * 100)) : 0;
-
   const onTrack = remaining >= 0;
-
-  /*
-   * Coin sound
-   */
-  const { playCoin } = useCoinSound();
 
   useEffect(() => {
     playCoin();
-  }, []);
+  }, [playCoin]);
 
-  function openBudgetModal() {
-    setIsBudgetModalOpen(true);
-  }
+  const handleSaveBudget = (newBudget: number) => {
+    localStorage.setItem("ipon-budget", String(newBudget));
+  };
 
-  function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     const amount = parseFloat(form.amount);
 
-    if (!form.name || Number.isNaN(amount) || amount <= 0) {
-      return;
-    }
+    if (!form.name || Number.isNaN(amount) || amount <= 0) return;
 
-    const meta = categoryMeta[form.category] ?? {
-      color: "terracotta" as const,
-      initial: form.name.charAt(0).toUpperCase(),
-    };
+    const categoryIdx = categories.indexOf(form.category);
+    const meta = getCategoryMeta(
+      form.category,
+      categoryIdx >= 0 ? categoryIdx : 0,
+    );
 
     const newTx: Transaction = {
       id: crypto.randomUUID(),
@@ -321,19 +182,17 @@ export default function Tracker() {
       method: "Card ···· 4821",
       initial: meta.initial,
       color: meta.color,
-      monthYear: getCurrentMonthKey(),
+      monthYear: selectedMonthYear,
     };
 
     setTransactions((prev) => [newTx, ...prev]);
-
     setForm({
       name: "",
       amount: "",
-      category: "Markets & dining",
+      category: categories[0] || "Markets & dining",
     });
-
     setIsModalOpen(false);
-  }
+  };
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-[#faf5ec] font-sans text-[#2c2115]">
@@ -346,14 +205,15 @@ export default function Tracker() {
 
       <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-6 py-10">
         {/* Header */}
-        <header className="vault-rise vault-rise-1 flex flex-wrap items-end justify-between gap-6 border-b border-[#2c2115]/15 pb-8">
+        <header className="flex flex-wrap items-end justify-between gap-6 border-b border-[#2c2115]/15 pb-8">
           <div>
-            <h1 className="font-display text-3xl font-medium tracking-tight text-[#2c2115] mb-12">
-              Welcome,
+            <h1 className="mb-4 font-display text-3xl font-medium tracking-tight text-[#2c2115]">
+              Welcome,{" "}
               <span className="font-semibold text-[#c96f4a]">
                 {user?.name || "Member"}
               </span>
             </h1>
+
             <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#a4522f]">
               <span className="size-2 rounded-full bg-[#c96f4a]" />
               IPON Ledger
@@ -396,7 +256,7 @@ export default function Tracker() {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           {/* Total spent */}
-          <div className="vault-rise vault-rise-2 rounded-2xl border border-[#2c2115]/15 bg-[#fffdf7]/80 p-6 shadow-[0_18px_40px_-24px_rgba(44,33,21,0.35)] backdrop-blur-sm">
+          <div className="rounded-2xl border border-[#2c2115]/15 bg-[#fffdf7]/80 p-6 shadow-sm backdrop-blur-sm">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8a7a63]">
               Total spent
             </div>
@@ -411,13 +271,13 @@ export default function Tracker() {
           </div>
 
           {/* Remaining budget */}
-          <div className="vault-rise vault-rise-3 rounded-2xl border border-[#2c2115]/15 bg-[#fffdf7]/80 p-6 shadow-[0_18px_40px_-24px_rgba(44,33,21,0.35)] backdrop-blur-sm">
+          <div className="rounded-2xl border border-[#2c2115]/15 bg-[#fffdf7]/80 p-6 shadow-sm backdrop-blur-sm">
             <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8a7a63]">
               <p>Remaining budget</p>
 
               <Button
                 type="button"
-                onClick={openBudgetModal}
+                onClick={() => setIsBudgetModalOpen(true)}
                 className="h-auto rounded-full bg-[#2c2115] px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] text-[#faf5ec] hover:bg-[#c96f4a]"
               >
                 Set budget
@@ -449,7 +309,7 @@ export default function Tracker() {
           </div>
 
           {/* Top category */}
-          <div className="vault-rise vault-rise-4 rounded-2xl border border-[#2c2115]/15 bg-[#fffdf7]/80 p-6 shadow-[0_18px_40px_-24px_rgba(44,33,21,0.35)] backdrop-blur-sm">
+          <div className="rounded-2xl border border-[#2c2115]/15 bg-[#fffdf7]/80 p-6 shadow-sm backdrop-blur-sm">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8a7a63]">
               Top category
             </div>
@@ -466,8 +326,8 @@ export default function Tracker() {
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="vault-rise vault-rise-2 rounded-2xl border border-[#2c2115]/15 bg-gradient-to-r from-[#f6dfa8]/70 via-[#f2c66d]/50 to-[#e89b6f]/40 p-5">
+        {/* Progress Bar */}
+        <div className="rounded-2xl border border-[#2c2115]/15 bg-gradient-to-r from-[#f6dfa8]/70 via-[#f2c66d]/50 to-[#e89b6f]/40 p-5">
           <div className="flex items-center justify-between text-xs font-medium text-[#6d4f3c]">
             <span className="uppercase tracking-[0.2em]">Budget used</span>
 
@@ -486,8 +346,8 @@ export default function Tracker() {
 
         {/* Content grid */}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          {/* Transactions */}
-          <div className="vault-rise vault-rise-3 rounded-2xl border border-[#2c2115]/15 bg-[#fffdf7]/80 p-7 shadow-[0_18px_40px_-24px_rgba(44,33,21,0.35)] backdrop-blur-sm lg:col-span-2">
+          {/* Recent Activity */}
+          <div className="rounded-2xl border border-[#2c2115]/15 bg-[#fffdf7]/80 p-7 shadow-sm backdrop-blur-sm lg:col-span-2">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-2xl font-medium">
                 Recent activity
@@ -507,10 +367,11 @@ export default function Tracker() {
                 : transactions
               ).map((t, idx) => {
                 const category = t.category || "General";
-                const meta = categoryMeta[category] ?? {
-                  color: "terracotta" as const,
-                  initial: category.charAt(0).toUpperCase(),
-                };
+                const categoryIdx = categories.indexOf(category);
+                const meta = getCategoryMeta(
+                  category,
+                  categoryIdx >= 0 ? categoryIdx : idx,
+                );
 
                 return (
                   <div
@@ -548,17 +409,13 @@ export default function Tracker() {
             </div>
           </div>
 
-          {/* Breakdown sidebar */}
-          <div className="vault-rise vault-rise-4 flex flex-col rounded-2xl border border-[#2c2115]/15 bg-[#fffdf7]/80 p-7 shadow-[0_18px_40px_-24px_rgba(44,33,21,0.35)] backdrop-blur-sm">
+          {/* Breakdown Sidebar */}
+          <div className="flex flex-col rounded-2xl border border-[#2c2115]/15 bg-[#fffdf7]/80 p-7 shadow-sm backdrop-blur-sm">
             <h2 className="font-display text-2xl font-medium">Where it went</h2>
 
             <div className="mt-6 flex flex-col gap-6">
-              {breakdown.map(([category, amount]) => {
-                const meta = categoryMeta[category] ?? {
-                  color: "terracotta" as const,
-                  initial: category.charAt(0).toUpperCase(),
-                };
-
+              {breakdown.map(([category, amount], idx) => {
+                const meta = getCategoryMeta(category, idx);
                 const pct = totalSpent
                   ? Math.round((amount / totalSpent) * 100)
                   : 0;
@@ -594,33 +451,10 @@ export default function Tracker() {
                 </div>
               )}
             </div>
-
-            <div className="mt-auto pt-6">
-              <div className="rounded-2xl border border-[#d99a3d]/30 bg-[#f6dfa8]/40 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#9a6a1e]">
-                  Curator's note
-                </div>
-
-                <p className="mt-1.5 text-sm leading-relaxed text-[#6d4f3c]">
-                  {topCategory === "Markets & dining"
-                    ? "Dining is up 12% this month. A $300 cap keeps you under budget."
-                    : topCategory === "Housing"
-                      ? "Housing makes up the largest share of your budget this month."
-                      : "Track consistently to spot spending patterns early."}
-                </p>
-              </div>
-            </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <footer className="vault-rise vault-rise-4 flex items-center justify-between border-t border-[#2c2115]/15 pt-6 text-[11px] uppercase tracking-[0.2em] text-[#8a7a63]">
-          <span>IPON Ledger</span>
-          <span>Est. 2025 · Budapest</span>
-        </footer>
       </div>
 
-      {/* MODALS */}
       <BudgetModal
         isOpen={isBudgetModalOpen}
         onClose={() => setIsBudgetModalOpen(false)}
@@ -636,11 +470,6 @@ export default function Tracker() {
         onSubmit={handleSubmit}
         form={form}
         setForm={setForm}
-        categories={Object.keys(categoryMeta)}
-        defaultCategories={Object.keys(defaultCategoryMeta)}
-        onAddCategory={addCategory}
-        onEditCategory={editCategory}
-        onDeleteCategory={deleteCategory}
       />
     </div>
   );

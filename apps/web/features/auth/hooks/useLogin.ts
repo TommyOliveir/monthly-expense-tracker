@@ -15,7 +15,7 @@ export function useLogin() {
     onSuccess: (data) => {
       // Save access token locally so subsequent requests can use it
       if (data?.accessToken) {
-        localStorage.setItem("accessToken", data.accessToken);
+        // localStorage.setItem("accessToken", data.accessToken);
         localStorage.setItem("user", JSON.stringify(data.user));
       }
     },
