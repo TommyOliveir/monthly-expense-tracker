@@ -32,9 +32,11 @@ export class BudgetService {
 
   async getMonthlySummary(userId: string, month: number, year: number) {
     // 1. Fetch Budget target for the month
-    const budget = await this.prisma.budget.findUnique({
+    const budget = await this.prisma.budget.findFirst({
       where: {
-        userId_year_month: { userId, year, month },
+        userId,
+        year,
+        month,
       },
     });
 
