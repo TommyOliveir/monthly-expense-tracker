@@ -48,13 +48,15 @@ export class BudgetService {
     const expenses = await this.prisma.expense.findMany({
       where: {
         userId,
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
+        year,
+        month,
       },
-      include: { category: true },
-      orderBy: { date: 'desc' },
+      include: {
+        category: true,
+      },
+      orderBy: {
+        date: 'desc',
+      },
     });
 
     const totalSpent = expenses.reduce(
