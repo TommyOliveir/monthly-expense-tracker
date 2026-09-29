@@ -38,11 +38,11 @@ export class BudgetService {
       },
     });
 
-    // Calculate start and end date for the target month
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+    // Calculate start and end date for the target month in UTC
+    const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+    const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
 
-    // 2. Fetch all Expenses for the month with category details using date range
+    // 2. Fetch all Expenses
     const expenses = await this.prisma.expense.findMany({
       where: {
         userId,
@@ -55,7 +55,6 @@ export class BudgetService {
       orderBy: { date: 'desc' },
     });
 
-    // 3. Calculate total spending
     const totalSpent = expenses.reduce(
       (sum, expense) => sum + Number(expense.amount),
       0,
