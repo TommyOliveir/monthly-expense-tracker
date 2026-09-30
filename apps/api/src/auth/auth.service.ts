@@ -16,8 +16,28 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
+  // Helper method to sign both tokens
+  private async generateTokens(userId: string, email: string) {
+    const payload = { sub: userId, email };
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        secret: process.env.JWT_SECRET || 'secretKey',
+        expiresIn: '15m', // Short-lived access token
+      }),
+      this.jwtService.signAsync(payload, {
+        secret: process.env.JWT_REFRESH_SECRET || 'refreshSecretKey',
+        expiresIn: '7d', // Long-lived refresh token
+      }),
+    ]);
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
   async registerUser(createUserDto: CreateUserDto) {
-    // 1. Check if email exists
     const existingUser = await this.userService.findByEmail(
       createUserDto.email,
     );
@@ -25,24 +45,14 @@ export class AuthService {
       throw new ConflictException('User with this email already exists');
     }
 
-    // 2. Create new user (UserService handles single Argon2 hashing + category seeding)
     const newUser = await this.userService.create(createUserDto);
+    const tokens = await this.generateTokens(newUser.id, newUser.email);
 
-    // 3. Create JWT payload
-    const payload = {
-      sub: newUser.id,
-      email: newUser.email,
-    };
-
-    // 4. Generate token
-    const accessToken = await this.jwtService.signAsync(payload);
-
-    // 5. Omit password hash from response
     const { password, ...userWithoutPassword } = newUser;
 
     return {
       user: userWithoutPassword,
-      accessToken,
+      ...tokens,
     };
   }
 
@@ -53,24 +63,38 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    // Verify plaintext login password against stored Argon2 hash
     const passwordIsValid = await verify(user.password, loginDto.password);
 
     if (!passwordIsValid) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const payload = {
-      sub: user.id,
-      email: user.email,
-    };
-
-    const accessToken = await this.jwtService.signAsync(payload);
+    const tokens = await this.generateTokens(user.id, user.email);
     const { password, ...userWithoutPassword } = user;
 
     return {
       user: userWithoutPassword,
-      accessToken,
+      ...tokens,
     };
+  }
+
+  async refreshTokens(refreshToken: string) {
+    try {
+      // 1. Verify refresh token signature & expiration
+      const payload = await this.jwtService.verifyAsync(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET || 'refreshSecretKey',
+      });
+
+      // 2. Fetch fresh user data
+      const user = await this.userService.findByEmail(payload.email);
+      if (!user) {
+        throw new UnauthorizedException('Access Denied');
+      }
+
+      // 3. Issue fresh tokens
+      return await this.generateTokens(user.id, user.email);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
   }
 }
