@@ -1,6 +1,8 @@
 export const categoryKeys = {
   all: ["categories"] as const,
   lists: () => [...categoryKeys.all, "list"] as const,
+  // listByUser: (userId?: string) =>
+  //   [...categoryKeys.lists(), { userId }] as const,
   list: (filters?: Record<string, unknown>) =>
     [...categoryKeys.lists(), filters] as const,
   details: () => [...categoryKeys.all, "detail"] as const,

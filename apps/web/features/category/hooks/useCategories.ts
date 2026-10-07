@@ -1,5 +1,3 @@
-// src/hooks/useCategories.ts
-
 import { useQuery } from "@tanstack/react-query";
 import { categoryKeys } from "../queries/categoryKeys";
 import { categoryQueries } from "../queries/categoryQueries";

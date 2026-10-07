@@ -16,8 +16,9 @@ export const ENDPOINTS = {
     update: (id: string) => `/category/${id}`,
     delete: (id: string) => `/category/delete/${id}`,
   },
-  tags: {
-    list: "/tags",
+  expenses: {
+    list: "/expense",
+    create: "/expense",
   },
   comments: {
     list: (postId: string) => `/posts/${postId}/comments`,

@@ -36,7 +36,7 @@ export class CategoryService {
       where: {
         OR: [
           { userId }, // User-created categories
-          { isDefault: true }, // System default categories
+          // { isDefault: true }, // System default categories
         ],
       },
       orderBy: { name: 'asc' },
@@ -77,6 +77,29 @@ export class CategoryService {
     }
   }
 
+  // async remove(userId: string, id: string) {
+  //   const category = await this.prisma.category.findUnique({
+  //     where: { id },
+  //   });
+
+  //   if (!category) {
+  //     throw new NotFoundException('Category not found.');
+  //   }
+
+  //   // Prevent deleting default system categories or categories owned by other users
+  //   if (category.isDefault || category.userId !== userId) {
+  //     throw new ForbiddenException(
+  //       'You do not have permission to delete this category.',
+  //     );
+  //   }
+
+  //   return await this.prisma.category.delete({
+  //     where: { id },
+  //   });
+  // }
+
+  // ... inside CategoryService
+
   async remove(userId: string, id: string) {
     const category = await this.prisma.category.findUnique({
       where: { id },
@@ -93,6 +116,19 @@ export class CategoryService {
       );
     }
 
+    // 1. Check if any expenses are associated with this category
+    const expenseCount = await this.prisma.expense.count({
+      where: { categoryId: id },
+    });
+
+    // 2. Block deletion if expenses exist
+    if (expenseCount > 0) {
+      throw new ConflictException(
+        `Cannot delete category because it contains ${expenseCount} expense(s). Please reassign or delete the expenses first.`,
+      );
+    }
+
+    // 3. Safe to delete since count is 0
     return await this.prisma.category.delete({
       where: { id },
     });
