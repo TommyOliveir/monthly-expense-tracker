@@ -27,12 +27,12 @@ export const expenseQueries = {
       payload,
     );
   },
-
-  delete: async (id: string): Promise<void> => {
-    return await del<void>(
-      ENDPOINTS.expenses.delete
-        ? ENDPOINTS.expenses.delete(id)
-        : `${ENDPOINTS.expenses.list}/${id}`,
-    );
-  },
+  // coming soon
+  // delete: async (id: string): Promise<void> => {
+  //   return await del<void>(
+  //     ENDPOINTS.expenses.delete
+  //       ? ENDPOINTS.expenses.delete(id)
+  //       : `${ENDPOINTS.expenses.list}/${id}`,
+  //   );
+  // },
 };

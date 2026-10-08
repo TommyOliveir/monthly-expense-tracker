@@ -1,6 +1,6 @@
-import type { IUser } from "@/features/auth/types/auth";
-import { get, post } from "./client";
 import { ENDPOINTS } from "../../api/endpoints";
+import { get, post } from "../../api/client";
+import { IUser } from "./types/auth";
 
 type VerifyOtpRequest = {
   email: string;
@@ -11,20 +11,6 @@ type VerifyOtpResponse = {
   access_token: string;
   refresh_token: string;
 };
-
-type SendOtpResponse = {
-  message: string;
-};
-
-export function sendOtp(email: string) {
-  return post<SendOtpResponse, { email: string }>(
-    ENDPOINTS.auth.sendOtp,
-    { email },
-    {
-      requiresAuth: false,
-    },
-  );
-}
 
 export function login(body: VerifyOtpRequest) {
   return post<VerifyOtpResponse, VerifyOtpRequest>(ENDPOINTS.auth.login, body, {
@@ -43,7 +29,7 @@ export function logoutAPI({ refreshToken }: { refreshToken: string | null }) {
     },
   );
 }
-
+// put this soon user should be call
 export async function getLoggedUser(): Promise<{ user: IUser }> {
   const user = await get<IUser>(ENDPOINTS.auth.me);
 

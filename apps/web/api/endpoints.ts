@@ -19,6 +19,7 @@ export const ENDPOINTS = {
   expenses: {
     list: "/expense",
     create: "/expense",
+    delete: "/not yet",
   },
   comments: {
     list: (postId: string) => `/posts/${postId}/comments`,

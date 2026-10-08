@@ -6,19 +6,20 @@ import { useCreateCategory } from "../../../features/category/hooks/useCategory"
 import { useDeleteCategory } from "../../../features/category/hooks/useDeleteCategory";
 import { useUpdateCategory } from "../../../features/category/hooks/useUpdateCategory";
 
+export interface ExpenseForm {
+  name: string;
+  amount: string;
+  category: string;
+  categoryId: string;
+  date: string;
+}
+
 export interface ExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => void;
-  form: { name: string; amount: string; categoryId: string; date?: string };
-  setForm: React.Dispatch<
-    React.SetStateAction<{
-      name: string;
-      amount: string;
-      categoryId: string;
-      date?: string;
-    }>
-  >;
+  form: ExpenseForm;
+  setForm: React.Dispatch<React.SetStateAction<ExpenseForm>>;
 }
 
 const NEW_CATEGORY_VALUE = "__new__";
@@ -46,10 +47,16 @@ export const ExpenseModal: FC<ExpenseModalProps> = ({
 
   if (!isOpen) return null;
 
-  const currentCategoryObj = categories.find((c) => c.id === form.categoryId);
   const isBusy = isCreatingCategory || isUpdatingCategory || isDeletingCategory;
 
-  //add when cate has expesne
+  //put this to utils
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return "Something went wrong. Please try again.";
+  };
 
   // --- ADD CATEGORY ---
   const commitNewCategory = async () => {
@@ -76,10 +83,8 @@ export const ExpenseModal: FC<ExpenseModalProps> = ({
       setIsAddingCategory(false);
       setNewCategory("");
       setCategoryError("");
-    } catch (err: any) {
-      setCategoryError(
-        err?.message || "Failed to create category. Please try again.",
-      );
+    } catch (err: unknown) {
+      setCategoryError(getErrorMessage(err));
     }
   };
 
@@ -116,10 +121,8 @@ export const ExpenseModal: FC<ExpenseModalProps> = ({
       setEditingCategoryId(null);
       setEditCategoryName("");
       setCategoryError("");
-    } catch (err: any) {
-      setCategoryError(
-        err?.message || "Failed to update category. Please try again.",
-      );
+    } catch (err: unknown) {
+      setCategoryError(getErrorMessage(err));
     }
   };
 
@@ -139,10 +142,8 @@ export const ExpenseModal: FC<ExpenseModalProps> = ({
         }));
       }
       setCategoryError("");
-    } catch (err: any) {
-      setCategoryError(
-        err?.message || "Failed to delete category. Please try again.",
-      );
+    } catch (err: unknown) {
+      setCategoryError(getErrorMessage(err));
     }
   };
 

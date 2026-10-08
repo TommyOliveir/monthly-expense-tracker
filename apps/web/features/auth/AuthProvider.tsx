@@ -14,7 +14,7 @@ import type {
   ILoginResponse,
   IUser,
   LoginPayload,
-  SignUpPayload,
+  ISignUpPayload,
 } from "./types/auth";
 import { post } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
@@ -30,38 +30,64 @@ export type AuthState = {
   accessToken: string | null;
   isAuthenticated: boolean;
   login: (payload: LoginPayload) => Promise<ILoginResponse>;
-  signup: (payload: SignUpPayload) => Promise<IUser>;
+  signup: (payload: ISignUpPayload) => Promise<IUser>;
   logout: () => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<IUser | null>(null);
+  // const [user, setUser] = useState<IUser | null>(null);
+  // const [accessToken, setAccessToken] = useState<string | null>(
+  //   () => getTokens()?.accessToken ?? null,
+  // );
+
+  // // Sync React state directly with tokenManager updates
+  // useEffect(() => {
+  //   const storedUser = localStorage.getItem("user");
+  //   if (storedUser) {
+  //     try {
+  //       setUser(JSON.parse(storedUser));
+  //     } catch {
+  //       localStorage.removeItem("user");
+  //     }
+  //   }
+
+  //   // Subscribe to token changes (e.g., login, logout, refresh, cross-tab changes)
+  //   const unsubscribe = subscribeToTokens((newTokens) => {
+  //     setAccessToken(newTokens?.accessToken ?? null);
+  //     if (!newTokens) {
+  //       setUser(null);
+  //       localStorage.removeItem("user");
+  //     }
+  //   });
+
+  //   return unsubscribe;
+  // }, []);
+
+  const [user, setUser] = useState<IUser | null>(() => {
+    const storedUser = localStorage.getItem("user");
+
+    if (!storedUser) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(storedUser) as IUser;
+    } catch {
+      localStorage.removeItem("user");
+      return null;
+    }
+  });
+
   const [accessToken, setAccessToken] = useState<string | null>(
     () => getTokens()?.accessToken ?? null,
   );
 
-  // Sync React state directly with tokenManager updates
   useEffect(() => {
-    // Hydrate tokens and user state on mount (client-side)
-    const initialTokens = getTokens();
-    if (initialTokens) {
-      setAccessToken(initialTokens.accessToken);
-    }
-
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem("user");
-      }
-    }
-
-    // Subscribe to token changes (e.g., login, logout, refresh, cross-tab changes)
     const unsubscribe = subscribeToTokens((newTokens) => {
       setAccessToken(newTokens?.accessToken ?? null);
+
       if (!newTokens) {
         setUser(null);
         localStorage.removeItem("user");
@@ -106,11 +132,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Signup handler
-  const signup = useCallback(async (payload: SignUpPayload): Promise<IUser> => {
-    return await post<IUser, SignUpPayload>(ENDPOINTS.auth.signup, payload, {
-      requiresAuth: false,
-    });
-  }, []);
+  const signup = useCallback(
+    async (payload: ISignUpPayload): Promise<IUser> => {
+      return await post<IUser, ISignUpPayload>(ENDPOINTS.auth.signup, payload, {
+        requiresAuth: false,
+      });
+    },
+    [],
+  );
 
   const value = useMemo<AuthState>(
     () => ({

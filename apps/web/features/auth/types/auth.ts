@@ -17,6 +17,7 @@ export interface LoginPayload {
 export interface ILoginResponse {
   user: IUser;
   accessToken: string;
+  refreshToken: string;
 }
 
 export interface ISignUpPayload {
