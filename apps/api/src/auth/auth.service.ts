@@ -8,7 +8,12 @@ import { CreateUserDto } from 'src/user/dto/create-user-dto';
 import { LoginDto } from './dto/login.dto';
 import { verify } from 'argon2';
 import { JwtService } from '@nestjs/jwt';
-
+interface JwtPayload {
+  sub: string;
+  email: string;
+  iat?: number;
+  exp?: number;
+}
 @Injectable()
 export class AuthService {
   constructor(
@@ -23,7 +28,8 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: process.env.JWT_SECRET || 'secretKey',
-        expiresIn: '15m', // Short-lived access token
+        // expiresIn: '15m',// Short-lived access token put this back with working on refersh token
+        expiresIn: '1d',
       }),
       this.jwtService.signAsync(payload, {
         secret: process.env.JWT_REFRESH_SECRET || 'refreshSecretKey',
@@ -48,7 +54,7 @@ export class AuthService {
     const newUser = await this.userService.create(createUserDto);
     const tokens = await this.generateTokens(newUser.id, newUser.email);
 
-    const { password, ...userWithoutPassword } = newUser;
+    const { ...userWithoutPassword } = newUser;
 
     return {
       user: userWithoutPassword,
@@ -70,7 +76,7 @@ export class AuthService {
     }
 
     const tokens = await this.generateTokens(user.id, user.email);
-    const { password, ...userWithoutPassword } = user;
+    const { ...userWithoutPassword } = user;
 
     return {
       user: userWithoutPassword,
@@ -81,9 +87,12 @@ export class AuthService {
   async refreshTokens(refreshToken: string) {
     try {
       // 1. Verify refresh token signature & expiration
-      const payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET || 'refreshSecretKey',
-      });
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(
+        refreshToken,
+        {
+          secret: process.env.JWT_REFRESH_SECRET || 'refreshSecretKey',
+        },
+      );
 
       // 2. Fetch fresh user data
       const user = await this.userService.findByEmail(payload.email);

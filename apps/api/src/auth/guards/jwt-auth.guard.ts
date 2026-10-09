@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { IAuthenticatedUser } from '../types/user';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -12,11 +13,16 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return super.canActivate(context);
   }
 
-  handleRequest(err: any, user: any, info: any) {
-    // Throw an explicit exception if JWT validation fails or user isn't found
+  handleRequest<TUser = IAuthenticatedUser>(
+    err: unknown,
+    user: TUser | false | null | undefined,
+  ): TUser {
     if (err || !user) {
-      throw err || new UnauthorizedException('Invalid or expired token');
+      throw err instanceof Error
+        ? err
+        : new UnauthorizedException('Invalid or expired token');
     }
+
     return user;
   }
 }

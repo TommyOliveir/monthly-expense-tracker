@@ -10,9 +10,28 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "prepare": "husky",
+    "check:api:lint": "npm --prefix apps/api run lint:check",
+    "check:api:types": "npm --prefix apps/api run typecheck",
+    "check:api:test": "npm --prefix apps/api test -- --runInBand",
+    "check:web:lint": "npm --prefix apps/web run lint",
+    "check:web:types": "npm --prefix apps/web run typecheck",
+    "check:web:test": "npm --prefix apps/web test -- --passWithNoTests",
+    "check:push": "npm run check:api:lint && npm run check:api:types && npm run check:api:test && npm run check:web:lint && npm run check:web:types && npm run check:web:test",
+    "typecheck:api": "npm --prefix apps/api run typecheck",
+    "typecheck:web": "npm --prefix apps/web run typecheck"
+  },
+  "lint-staged": {
+    "apps/api/**/*.{ts,tsx}": [
+      "bash -c 'cd apps/api && npx eslint --fix ${@#apps/api/}' --"
+    ],
+    "apps/web/**/*.{ts,tsx}": [
+      "bash -c 'cd apps/web && npx eslint --fix ${@#apps/web/}' --"
+    ]
   },
   "devDependencies": {
+    "husky": "^9.1.7",
     "prettier": "^3.9.6",
     "turbo": "^2.0.0"
   },

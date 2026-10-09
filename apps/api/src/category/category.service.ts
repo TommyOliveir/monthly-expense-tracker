@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service'; // Adjust path if needed
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class CategoryService {
@@ -20,13 +21,25 @@ export class CategoryService {
           userId,
         },
       });
-    } catch (error) {
-      // Handles duplicate category name for the same user (@@unique([userId, name]))
-      if (error.code === 'P2002') {
+      //   } catch (error) {
+      //     // Handles duplicate category name for the same user (@@unique([userId, name]))
+      //     if (error.code === 'P2002') {
+      //       throw new ConflictException(
+      //         'A category with this name already exists.',
+      //       );
+      //     }
+      //     throw error;
+      //   }
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         throw new ConflictException(
           'A category with this name already exists.',
         );
       }
+
       throw error;
     }
   }
@@ -67,38 +80,28 @@ export class CategoryService {
         where: { id },
         data: updateCategoryDto,
       });
-    } catch (error) {
-      if (error.code === 'P2002') {
+      //   } catch (error) {
+      //     if (error.code === 'P2002') {
+      //       throw new ConflictException(
+      //         'A category with this name already exists.',
+      //       );
+      //     }
+      //     throw error;
+      //   }
+      // }
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         throw new ConflictException(
           'A category with this name already exists.',
         );
       }
+
       throw error;
     }
   }
-
-  // async remove(userId: string, id: string) {
-  //   const category = await this.prisma.category.findUnique({
-  //     where: { id },
-  //   });
-
-  //   if (!category) {
-  //     throw new NotFoundException('Category not found.');
-  //   }
-
-  //   // Prevent deleting default system categories or categories owned by other users
-  //   if (category.isDefault || category.userId !== userId) {
-  //     throw new ForbiddenException(
-  //       'You do not have permission to delete this category.',
-  //     );
-  //   }
-
-  //   return await this.prisma.category.delete({
-  //     where: { id },
-  //   });
-  // }
-
-  // ... inside CategoryService
 
   async remove(userId: string, id: string) {
     const category = await this.prisma.category.findUnique({
