@@ -29,6 +29,7 @@ export type AuthState = {
   user: IUser | null;
   accessToken: string | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (payload: LoginPayload) => Promise<ILoginResponse>;
   signup: (payload: ISignUpPayload) => Promise<IUser>;
   logout: () => void;
@@ -37,67 +38,52 @@ export type AuthState = {
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // const [user, setUser] = useState<IUser | null>(null);
-  // const [accessToken, setAccessToken] = useState<string | null>(
-  //   () => getTokens()?.accessToken ?? null,
-  // );
-
-  // // Sync React state directly with tokenManager updates
-  // useEffect(() => {
-  //   const storedUser = localStorage.getItem("user");
-  //   if (storedUser) {
-  //     try {
-  //       setUser(JSON.parse(storedUser));
-  //     } catch {
-  //       localStorage.removeItem("user");
-  //     }
-  //   }
-
-  //   // Subscribe to token changes (e.g., login, logout, refresh, cross-tab changes)
-  //   const unsubscribe = subscribeToTokens((newTokens) => {
-  //     setAccessToken(newTokens?.accessToken ?? null);
-  //     if (!newTokens) {
-  //       setUser(null);
-  //       localStorage.removeItem("user");
-  //     }
-  //   });
-
-  //   return unsubscribe;
-  // }, []);
-
-  const [user, setUser] = useState<IUser | null>(() => {
-    const storedUser = localStorage.getItem("user");
-
-    if (!storedUser) {
-      return null;
-    }
-
-    try {
-      return JSON.parse(storedUser) as IUser;
-    } catch {
-      localStorage.removeItem("user");
-      return null;
-    }
-  });
-
-  const [accessToken, setAccessToken] = useState<string | null>(
-    () => getTokens()?.accessToken ?? null,
-  );
+  const [user, setUser] = useState<IUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    // 1. Subscribe to token changes
     const unsubscribe = subscribeToTokens((newTokens) => {
       setAccessToken(newTokens?.accessToken ?? null);
 
       if (!newTokens) {
         setUser(null);
-        localStorage.removeItem("user");
+        try {
+          localStorage.removeItem("user");
+        } catch {
+          // Ignore storage restrictions
+        }
       }
     });
 
-    return unsubscribe;
+    // 2. Schedule client hydration after mount to avoid ESLint synchronous setState error
+    const frameId = requestAnimationFrame(() => {
+      const initialTokens = getTokens();
+      if (initialTokens?.accessToken) {
+        setAccessToken(initialTokens.accessToken);
+      }
+
+      try {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+          setUser(JSON.parse(storedUser) as IUser);
+        }
+      } catch (error) {
+        console.error("Failed to parse stored user:", error);
+        localStorage.removeItem("user");
+      } finally {
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      unsubscribe();
+    };
   }, []);
 
-  // Login handler using tokenManager
+  // Login handler
   const login = useCallback(
     async (payload: LoginPayload): Promise<ILoginResponse> => {
       const res = await post<ILoginResponse, LoginPayload>(
@@ -107,7 +93,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
 
       if (res?.accessToken) {
-        // Save tokens in tokenManager (handles both accessToken and optional refreshToken)
         setTokens({
           accessToken: res.accessToken,
           refreshToken: res.refreshToken ?? null,
@@ -115,7 +100,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (res.user) {
           setUser(res.user);
-          localStorage.setItem("user", JSON.stringify(res.user));
+          try {
+            localStorage.setItem("user", JSON.stringify(res.user));
+          } catch (e) {
+            console.error("Failed to save user to localStorage:", e);
+          }
         }
       }
 
@@ -124,11 +113,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // Logout handler clearing tokenManager
+  // Logout handler
   const logout = useCallback(() => {
     setUser(null);
-    localStorage.removeItem("user");
-    clearTokens(); // Resets token state and clears localStorage automatically
+    try {
+      localStorage.removeItem("user");
+    } catch {
+      // Safely ignore storage block errors
+    }
+    clearTokens();
   }, []);
 
   // Signup handler
@@ -146,11 +139,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       accessToken,
       isAuthenticated: Boolean(accessToken),
+      isLoading,
       login,
       signup,
       logout,
     }),
-    [user, accessToken, login, signup, logout],
+    [user, accessToken, isLoading, login, signup, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
