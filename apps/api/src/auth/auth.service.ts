@@ -6,7 +6,7 @@ import {
 import { UserService } from '../user/user.service';
 import { CreateUserDto } from 'src/user/dto/create-user-dto';
 import { LoginDto } from './dto/login.dto';
-import { verify } from 'argon2';
+import { hash, verify } from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 interface JwtPayload {
   sub: string;
@@ -43,6 +43,18 @@ export class AuthService {
     };
   }
 
+  // 2. CREATE THE HELPER METHOD HERE
+  private async updateRefreshTokenHash(
+    userId: string,
+    refreshToken: string | null,
+  ) {
+    // If refreshToken is provided, hash it. If null (during logout), keep it null.
+    const refreshTokenHash = refreshToken ? await hash(refreshToken) : null;
+
+    // Call the update method in your UserService
+    await this.userService.update(userId, { refreshTokenHash });
+  }
+
   async registerUser(createUserDto: CreateUserDto) {
     const existingUser = await this.userService.findByEmail(
       createUserDto.email,
@@ -53,11 +65,11 @@ export class AuthService {
 
     const newUser = await this.userService.create(createUserDto);
     const tokens = await this.generateTokens(newUser.id, newUser.email);
-
-    const { ...userWithoutPassword } = newUser;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, refreshTokenHash, ...userWithoutSecrets } = newUser;
 
     return {
-      user: userWithoutPassword,
+      user: userWithoutSecrets,
       ...tokens,
     };
   }
@@ -76,12 +88,24 @@ export class AuthService {
     }
 
     const tokens = await this.generateTokens(user.id, user.email);
-    const { ...userWithoutPassword } = user;
+
+    // ⚠️ CRITICAL MISSING STEP: Hash and save the refresh token to the database
+    await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, refreshTokenHash, ...userWithoutSecrets } = user;
 
     return {
-      user: userWithoutPassword,
+      user: userWithoutSecrets,
       ...tokens,
     };
+  }
+  // auth.service.ts
+  async logout(userId: string) {
+    // Clear the stored refresh token hash in database
+    await this.userService.update(userId, { refreshTokenHash: null });
+
+    return { message: 'Logged out successfully' };
   }
 
   async refreshTokens(refreshToken: string) {

@@ -31,8 +31,8 @@ export type AuthState = {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (payload: LoginPayload) => Promise<ILoginResponse>;
-  signup: (payload: ISignUpPayload) => Promise<IUser>;
-  logout: () => void;
+  signup: (payload: ISignUpPayload) => Promise<ILoginResponse>;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -113,23 +113,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // Logout handler
-  const logout = useCallback(() => {
-    setUser(null);
+  // Updated Logout handler
+  const logout = useCallback(async () => {
     try {
-      localStorage.removeItem("user");
-    } catch {
-      // Safely ignore storage block errors
+      // 1. Fire request to backend to invalidate refreshTokenHash in DB
+      await post(ENDPOINTS.auth.logout, {}, { requiresAuth: true });
+    } catch (error) {
+      console.error("Logout request failed on server:", error);
+    } finally {
+      // 2. Always clean up client-side storage regardless of network result
+      setUser(null);
+      try {
+        localStorage.removeItem("user");
+      } catch {
+        // Safely ignore storage block errors
+      }
+      clearTokens();
     }
-    clearTokens();
   }, []);
 
-  // Signup handler
   const signup = useCallback(
-    async (payload: ISignUpPayload): Promise<IUser> => {
-      return await post<IUser, ISignUpPayload>(ENDPOINTS.auth.signup, payload, {
-        requiresAuth: false,
-      });
+    async (payload: ISignUpPayload): Promise<ILoginResponse> => {
+      const res = await post<ILoginResponse, ISignUpPayload>(
+        ENDPOINTS.auth.signup,
+        payload,
+        { requiresAuth: false },
+      );
+
+      if (res?.accessToken) {
+        setTokens({
+          accessToken: res.accessToken,
+          refreshToken: res.refreshToken ?? null,
+        });
+
+        if (res.user) {
+          setUser(res.user);
+          try {
+            localStorage.setItem("user", JSON.stringify(res.user));
+          } catch (e) {
+            console.error("Failed to save user to localStorage:", e);
+          }
+        }
+      }
+
+      return res;
     },
     [],
   );

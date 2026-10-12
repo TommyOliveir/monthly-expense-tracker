@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { hash } from 'argon2';
 import { CreateUserDto } from './dto/create-user-dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UserService {
@@ -53,6 +54,14 @@ export class UserService {
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },
+    });
+  }
+
+  // 2. Generic update method (used to update refreshTokenHash, profile, etc.)
+  async update(id: string, data: Prisma.UserUpdateInput) {
+    return this.prisma.user.update({
+      where: { id },
+      data,
     });
   }
 }

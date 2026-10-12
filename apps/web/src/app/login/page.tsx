@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation"; // 1. Import Next.js Router
+import React, { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation"; // 1. Import Next.js Router
 import {
   Eye,
   EyeOff,
@@ -21,12 +21,17 @@ import { useLogin } from "../../../features/auth/hooks/useLogin";
 import { useSignup } from "../../../features/auth/hooks/useSignup";
 
 export default function AuthPage() {
-  const router = useRouter(); // 2. Initialize router
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const modeFromUrl =
+    searchParams.get("mode") === "register" ? "register" : "login";
+
+  const [authMode, setAuthMode] = useState<"login" | "register">(modeFromUrl);
+  const [prevModeFromUrl, setPrevModeFromUrl] = useState(modeFromUrl);
 
   const { login } = useLogin();
   const { signup } = useSignup();
@@ -56,6 +61,11 @@ export default function AuthPage() {
       setFormErrors((prev) => ({ ...prev, [name]: null }));
     }
   };
+
+  if (prevModeFromUrl !== modeFromUrl) {
+    setPrevModeFromUrl(modeFromUrl);
+    setAuthMode(modeFromUrl);
+  }
 
   const showNotification = (msg: string) => {
     setToastMessage(msg);
@@ -171,7 +181,7 @@ export default function AuthPage() {
           </div>
           <div>
             <span className="font-serif text-lg font-bold text-[#2c2115] tracking-tight block leading-none">
-              Aura
+              Ipon
             </span>
             <span className="text-[10px] tracking-[0.2em] uppercase font-semibold text-[#8a7a63]">
               Finances
