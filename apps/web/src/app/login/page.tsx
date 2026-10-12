@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation"; // 1. Import Next.js Router
 import {
   Eye,
@@ -20,7 +20,7 @@ import {
 import { useLogin } from "../../../features/auth/hooks/useLogin";
 import { useSignup } from "../../../features/auth/hooks/useSignup";
 
-export default function AuthPage() {
+export function AuthPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
@@ -542,5 +542,13 @@ export default function AuthPage() {
         </p>
       </footer>
     </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<div>Loading login...</div>}>
+      <AuthPageContent />
+    </Suspense>
   );
 }
