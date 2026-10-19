@@ -103,6 +103,7 @@ const initialSeedTransactions: Transaction[] = [
 
 export default function Tracker() {
   const { user } = useAuth();
+  const firstName = user?.name?.trim().split(/\s+/)[0];
   const { playCoin } = useCoinSound();
   const { categories } = useCategories();
   const { createExpense } = useCreateExpense();
@@ -114,6 +115,9 @@ export default function Tracker() {
     const [y, m] = selectedMonthYear.split("-").map(Number);
     return [y || new Date().getFullYear(), m || new Date().getMonth() + 1];
   }, [selectedMonthYear]);
+
+  // "YYYY-MM" strings compare correctly as plain strings
+  const isPastMonth = selectedMonthYear < getCurrentMonthKey();
 
   const { budgetSummary, isBudgetSummaryLoading } = useBudgetSummary({
     month: selectedMonth,
@@ -230,12 +234,18 @@ export default function Tracker() {
       <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-6 py-10">
         <header className="flex flex-wrap items-end justify-between gap-6 border-b border-[#2c2115]/15 pb-8">
           <div>
-            <h1 className="mb-4 font-display text-3xl font-medium tracking-tight text-[#2c2115]">
-              Welcome,{" "}
-              <span className="font-semibold text-[#c96f4a]">
-                {user?.name || "Member"}
-              </span>
-            </h1>
+            <p className="mb-4 text-lg text-[#8a7a63]">
+              Welcome back
+              {firstName && (
+                <>
+                  ,{" "}
+                  <span className="font-semibold text-[#2c2115]">
+                    {firstName}
+                  </span>
+                </>
+              )}
+              <span aria-hidden> 👋</span>
+            </p>
 
             <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#a4522f]">
               <span className="size-2 rounded-full bg-[#c96f4a]" />
@@ -246,6 +256,11 @@ export default function Tracker() {
                 onChange={(e) => setSelectedMonthYear(e.target.value)}
                 className="rounded-lg border border-[#2c2115]/20 bg-[#fffdf7] px-3 py-1 text-xs font-semibold text-[#2c2115] shadow-sm outline-none transition focus:border-[#c96f4a]"
               />
+              {isPastMonth && (
+                <span className="rounded-full bg-[#2c2115]/10 px-3 py-1 text-[10px] tracking-[0.15em] text-[#6d4f3c]">
+                  View only
+                </span>
+              )}
             </div>
 
             <h1 className="mt-3 font-display text-5xl font-medium leading-[1.05] tracking-tight sm:text-6xl">
@@ -266,22 +281,24 @@ export default function Tracker() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (categories.length > 0 && !form.categoryId) {
-                  setForm((prev) => ({
-                    ...prev,
-                    categoryId: categories[0].id,
-                    category: categories[0].name,
-                  }));
-                }
-                setIsModalOpen(true);
-              }}
-              className="rounded-full bg-[#2c2115] px-6 py-3 text-sm font-semibold text-[#faf5ec] shadow-lg shadow-[#c96f4a]/25 transition hover:bg-[#c96f4a]"
-            >
-              Add expense
-            </button>
+            {!isPastMonth && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (categories.length > 0 && !form.categoryId) {
+                    setForm((prev) => ({
+                      ...prev,
+                      categoryId: categories[0].id,
+                      category: categories[0].name,
+                    }));
+                  }
+                  setIsModalOpen(true);
+                }}
+                className="rounded-full bg-[#2c2115] px-6 py-3 text-sm font-semibold text-[#faf5ec] shadow-lg shadow-[#c96f4a]/25 transition hover:bg-[#c96f4a]"
+              >
+                Add expense
+              </button>
+            )}
           </div>
         </header>
 
@@ -304,13 +321,15 @@ export default function Tracker() {
             <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8a7a63]">
               <p>Remaining budget</p>
 
-              <Button
-                type="button"
-                onClick={() => setIsBudgetModalOpen(true)}
-                className="h-auto rounded-full bg-[#2c2115] px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] text-[#faf5ec] hover:bg-[#c96f4a]"
-              >
-                Set budget
-              </Button>
+              {!isPastMonth && (
+                <Button
+                  type="button"
+                  onClick={() => setIsBudgetModalOpen(true)}
+                  className="h-auto rounded-full bg-[#2c2115] px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] text-[#faf5ec] hover:bg-[#c96f4a]"
+                >
+                  Set budget
+                </Button>
+              )}
             </div>
 
             <div
@@ -489,7 +508,7 @@ export default function Tracker() {
       </div>
 
       <BudgetModal
-        isOpen={isBudgetModalOpen}
+        isOpen={isBudgetModalOpen && !isPastMonth}
         onClose={() => setIsBudgetModalOpen(false)}
         currentBudget={budget}
         totalSpent={totalSpent}
@@ -497,7 +516,7 @@ export default function Tracker() {
       />
 
       <ExpenseModal
-        isOpen={isModalOpen}
+        isOpen={isModalOpen && !isPastMonth}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleSubmit}
         form={form}
