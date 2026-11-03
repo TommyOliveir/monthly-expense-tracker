@@ -4,7 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service'; // Adjust path if needed
+import { PrismaService } from '@/prisma/prisma.service'; // Adjust path if needed
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Prisma } from '@prisma/client';

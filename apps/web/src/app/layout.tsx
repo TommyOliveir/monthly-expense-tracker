@@ -3,7 +3,7 @@ import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import QueryProvider from "@/providers/query-provider";
-import { AuthProvider } from "../../features/auth/AuthProvider";
+import { AuthProvider } from "@/features/auth/AuthProvider";
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({

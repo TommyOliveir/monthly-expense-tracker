@@ -9,7 +9,7 @@
 // } from '@nestjs/common';
 // import { ExpenseService } from './expense.service';
 // import { CreateExpenseDto } from './dto/create-expense.dto';
-// import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+// import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 
 // @UseGuards(JwtAuthGuard)
 // @Controller('expense')
@@ -44,8 +44,8 @@ import {
 } from '@nestjs/common';
 import { ExpenseService } from './expense.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { IAuthenticatedRequest } from 'src/auth/types/user';
+import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
+import { IAuthenticatedRequest } from '@/auth/types/user';
 
 @UseGuards(JwtAuthGuard)
 @Controller('expense')

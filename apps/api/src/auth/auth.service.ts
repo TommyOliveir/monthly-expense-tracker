@@ -3,8 +3,8 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { UserService } from '../user/user.service';
-import { CreateUserDto } from 'src/user/dto/create-user-dto';
+import { UserService } from '@/user/user.service';
+import { CreateUserDto } from '@/user/dto/create-user-dto';
 import { LoginDto } from './dto/login.dto';
 import { hash, verify } from 'argon2';
 import { JwtService } from '@nestjs/jwt';

@@ -17,8 +17,8 @@ import {
   KeyRound,
   Check,
 } from "lucide-react";
-import { useLogin } from "../../../features/auth/hooks/useLogin";
-import { useSignup } from "../../../features/auth/hooks/useSignup";
+import { useLogin } from "@/features/auth/hooks/useLogin";
+import { useSignup } from "@/features/auth/hooks/useSignup";
 
 export function AuthPageContent() {
   const router = useRouter();

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useLogout } from "../../features/auth/hooks/useLogout";
-import { useAuth } from "../../features/auth/AuthProvider";
+import { useLogout } from "@/features/auth/hooks/useLogout";
+import { useAuth } from "@/features/auth/AuthProvider";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 

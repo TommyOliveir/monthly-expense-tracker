@@ -1,10 +1,10 @@
 "use client";
 
-import React, { FC, useState } from "react";
-import { useCategories } from "../../../features/category/hooks/useCategories";
-import { useCreateCategory } from "../../../features/category/hooks/useCategory";
-import { useDeleteCategory } from "../../../features/category/hooks/useDeleteCategory";
-import { useUpdateCategory } from "../../../features/category/hooks/useUpdateCategory";
+import React, { useState } from "react";
+import { useCategories } from "@/features/category/hooks/useCategories";
+import { useCreateCategory } from "@/features/category/hooks/useCategory";
+import { useDeleteCategory } from "@/features/category/hooks/useDeleteCategory";
+import { useUpdateCategory } from "@/features/category/hooks/useUpdateCategory";
 
 export interface ExpenseForm {
   name: string;
@@ -24,13 +24,13 @@ export interface ExpenseModalProps {
 
 const NEW_CATEGORY_VALUE = "__new__";
 
-export const ExpenseModal: FC<ExpenseModalProps> = ({
+export function ExpenseModal({
   isOpen,
   onClose,
   onSubmit,
   form,
   setForm,
-}) => {
+}: ExpenseModalProps) {
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [isManagingCategories, setIsManagingCategories] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
@@ -452,4 +452,4 @@ export const ExpenseModal: FC<ExpenseModalProps> = ({
       </div>
     </div>
   );
-};
+}

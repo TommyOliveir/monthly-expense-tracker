@@ -10,8 +10,8 @@ import {
 } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
-import { GetUser } from 'src/auth/decorators/get-user.decorator';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { GetUser } from '@/auth/decorators/get-user.decorator';
+import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @UseGuards(JwtAuthGuard)

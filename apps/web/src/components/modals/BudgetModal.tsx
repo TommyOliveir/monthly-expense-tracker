@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useSetBudget } from "../../../features/budget/hooks/useSetBudget";
+import { useSetBudget } from "@/features/budget/hooks/useSetBudget";
 
 export interface BudgetModalProps {
   /** Controls modal visibility */
@@ -14,13 +14,13 @@ export interface BudgetModalProps {
   formatCurrency?: (value: number) => string;
 }
 
-export const BudgetModal: React.FC<BudgetModalProps> = ({
+export function BudgetModal({
   isOpen,
   onClose,
   currentBudget,
   totalSpent,
   formatCurrency = (val) => `$${val.toFixed(2)}`,
-}) => {
+}: BudgetModalProps) {
   const { setBudget, isSettingBudget, setBudgetError } = useSetBudget();
 
   const currentDate = new Date();
@@ -173,4 +173,4 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
       </div>
     </div>
   );
-};
+}

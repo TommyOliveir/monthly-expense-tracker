@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { IAuthenticatedUser } from '../types/user';
+import { IAuthenticatedRequest, IAuthenticatedUser } from '@/auth/types/user';
 
 // export const GetUser = createParamDecorator(
 //   (data: string | undefined, ctx: ExecutionContext) => {
@@ -11,14 +11,10 @@ import { IAuthenticatedUser } from '../types/user';
 //   },
 // );
 
-type AuthenticatedRequest = Request & {
-  user?: IAuthenticatedUser;
-};
-
 export const GetUser = createParamDecorator<
   keyof IAuthenticatedUser | undefined
 >((data: keyof IAuthenticatedUser | undefined, ctx: ExecutionContext) => {
-  const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
+  const request = ctx.switchToHttp().getRequest<IAuthenticatedRequest>();
   const user = request.user;
 
   return data ? user?.[data] : user;

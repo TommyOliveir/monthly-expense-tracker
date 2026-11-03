@@ -13,8 +13,8 @@ import {
 import { BudgetService } from './budget.service';
 import { CreateBudgetDto } from './dto/create-budget.dto';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { GetUser } from 'src/auth/decorators/get-user.decorator';
+import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
+import { GetUser } from '@/auth/decorators/get-user.decorator';
 
 @Controller('budget')
 @UseGuards(JwtAuthGuard) // Guarantees req.user exists from validated JWT

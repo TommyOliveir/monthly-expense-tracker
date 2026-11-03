@@ -1,14 +1,17 @@
 "use client";
 
 import { BudgetModal } from "@/components/modals/BudgetModal";
-import { ExpenseModal } from "@/components/modals/EspenseModal";
+import {
+  ExpenseModal,
+  type ExpenseForm,
+} from "@/components/modals/EspenseModal";
 import { Button } from "@/components/ui/button";
 import { useCoinSound } from "@/hooks/use-coin-sound";
 import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "../../../features/auth/AuthProvider";
-import { useBudgetSummary } from "../../../features/budget/hooks/useBudgetSummary";
-import { useCategories } from "../../../features/category/hooks/useCategories";
-import { useCreateExpense } from "../../../features/expense/hooks/useCreateExpense";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { useBudgetSummary } from "@/features/budget/hooks/useBudgetSummary";
+import { useCategories } from "@/features/category/hooks/useCategories";
+import { useCreateExpense } from "@/features/expense/hooks/useCreateExpense";
 
 export type TxColor = "terracotta" | "amber" | "olive" | "clay";
 
@@ -135,7 +138,7 @@ export default function Tracker() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ExpenseForm>({
     name: "",
     amount: "",
     category: "",
