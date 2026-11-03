@@ -1,81 +1,178 @@
 "use client";
 
 import Link from "next/link";
-import { useLogout } from "@/features/auth/hooks/useLogout";
-import { useAuth } from "@/features/auth/AuthProvider";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { CoinsIcon, LogOutIcon } from "lucide-react";
 import { toast } from "sonner";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { useLogout } from "@/features/auth/hooks/useLogout";
+import { CurrencyMenuItems } from "@/features/currency/components/CurrencyMenuItems";
+import { useCurrency } from "@/features/currency/hooks/useCurrency";
+
+const APP_LINKS = [
+  { href: "/tracker", label: "Tracker" },
+  { href: "/about", label: "About" },
+] as const;
 
 export default function Navbar() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { logout, isLoggingOut } = useLogout();
+  const { currency, setCurrency } = useCurrency();
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleLogout = () => {
     logout(undefined, {
       onSuccess: () => {
-        // Redirect to login page after successful logout
         toast.success("Logged out successfully");
         router.push("/login");
       },
       onError: (error) => {
-        // Show a notification informing the user the server call failed
+        // Tokens are already cleared locally, so the user is logged out either way.
         toast.error("Could not reach server, but logged out locally.");
         console.error("Logout server error:", error);
-
-        // Still redirect to login since local storage and tokens were wiped
         router.push("/login");
       },
     });
   };
 
+  const displayName = user?.name || user?.email || "Account";
+
   return (
-    <nav className="sticky top-0 z-40 w-full border-b border-[#2c2115]/10 bg-[#faf5ec]/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <Link
-          href={isAuthenticated ? "/tracker" : "/"}
-          className="flex items-center gap-2 text-[#2c2115]"
-        >
-          <span className="size-2.5 rounded-full bg-[#c96f4a]" />
-          <span className="text-sm font-semibold uppercase tracking-[0.28em]">
-            IPON Ledger
-          </span>
-        </Link>
+    <nav className="sticky top-0 z-40 w-full border-b bg-background/85 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-6">
+          <Link
+            href="/"
+            className="flex items-center gap-2 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <span aria-hidden className="size-2.5 rounded-full bg-brand" />
+            <span className="text-sm font-semibold tracking-[0.2em] uppercase">
+              IPON Ledger
+            </span>
+          </Link>
+
+          {isAuthenticated && (
+            <ul className="hidden items-center gap-1 sm:flex">
+              {APP_LINKS.map((link) => {
+                const isActive = pathname === link.href;
+                return (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      aria-current={isActive ? "page" : undefined}
+                      className={cn(
+                        buttonVariants({ variant: "ghost" }),
+                        "h-9 px-3 text-muted-foreground",
+                        isActive && "bg-muted text-foreground",
+                      )}
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
 
         {/* Hide auth actions until the stored session is hydrated to avoid a flash */}
         {!isLoading && (
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2">
             {isAuthenticated ? (
-              <>
-                {user && (
-                  <span
-                    title={`${user.name} · ${user.email}`}
-                    aria-label={`Signed in as ${user.name || user.email}`}
-                    className="grid size-9 place-items-center rounded-full bg-[#c96f4a]/15 text-sm font-semibold text-[#a4522f]"
-                  >
-                    {(user.name || user.email).charAt(0).toUpperCase()}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  disabled={isLoggingOut}
-                  className="rounded-full border border-[#2c2115]/20 px-4 py-2 text-sm font-semibold text-[#2c2115] transition hover:border-[#c96f4a] hover:text-[#c96f4a] disabled:opacity-50"
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      className="size-10 rounded-full bg-brand/15 p-0 font-semibold text-brand-foreground hover:bg-brand/25"
+                      aria-label={`Account menu for ${displayName}`}
+                    />
+                  }
                 >
-                  {isLoggingOut ? "Logging out…" : "Logout"}
-                </button>
-              </>
+                  {displayName.charAt(0).toUpperCase()}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel className="flex flex-col gap-0.5 py-1.5">
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {displayName}
+                      </span>
+                      {user?.email && user.name && (
+                        <span className="truncate text-xs font-normal text-muted-foreground">
+                          {user.email}
+                        </span>
+                      )}
+                    </DropdownMenuLabel>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup className="sm:hidden">
+                    {APP_LINKS.map((link) => (
+                      <DropdownMenuItem
+                        key={link.href}
+                        className="h-9"
+                        onClick={() => router.push(link.href)}
+                      >
+                        {link.label}
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                  </DropdownMenuGroup>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="h-9">
+                      <CoinsIcon aria-hidden />
+                      Currency
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {currency}
+                      </span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-56">
+                      <CurrencyMenuItems
+                        value={currency}
+                        onValueChange={setCurrency}
+                      />
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    className="h-9"
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                  >
+                    <LogOutIcon aria-hidden />
+                    {isLoggingOut ? "Logging out…" : "Log out"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <>
                 <Link
                   href="/login?mode=login"
-                  className="rounded-full px-4 py-2 text-sm font-semibold text-[#2c2115] transition hover:text-[#c96f4a]"
+                  className={cn(
+                    buttonVariants({ variant: "ghost" }),
+                    "h-10 px-4",
+                  )}
                 >
-                  Login
+                  Log in
                 </Link>
                 <Link
                   href="/login?mode=register"
-                  className="rounded-full bg-[#2c2115] px-4 py-2 text-sm font-semibold text-[#faf5ec] shadow-md shadow-[#c96f4a]/20 transition hover:bg-[#c96f4a]"
+                  className={cn(buttonVariants(), "h-10 px-4")}
                 >
                   Register
                 </Link>

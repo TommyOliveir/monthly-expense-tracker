@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { expenseKeys } from "@/features/expense/queries/expenseKeys";
+import { budgetKeys } from "@/features/budget/queries/budgetKeys";
 import { expenseQueries } from "@/features/expense/queries/expenseQueries";
 import { CreateExpensePayload } from "@/features/expense/types/expense";
 
@@ -17,7 +18,7 @@ export function useCreateExpense() {
     onSuccess: () => {
       // Refresh expenses list & budget summary after adding an expense
       queryClient.invalidateQueries({ queryKey: expenseKeys.all });
-      queryClient.invalidateQueries({ queryKey: ["budget"] });
+      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
     },
   });
 

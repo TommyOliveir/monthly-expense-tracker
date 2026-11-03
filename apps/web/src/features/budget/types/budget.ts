@@ -16,3 +16,5 @@ export interface IBudgetSummary extends BudgetSummaryParams {
   remaining: number;
   expenses: ExpenseWithCategory[];
 }
+
+export type BudgetStatus = "unset" | "on-track" | "near-limit" | "over";
