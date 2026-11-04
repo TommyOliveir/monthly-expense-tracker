@@ -1,11 +1,14 @@
 import { useSyncExternalStore } from "react";
+import type { InstallMethod } from "@/features/pwa/types/installPrompt";
 import { useIsStandalone } from "@/features/pwa/hooks/useIsStandalone";
 import { isIosDevice } from "@/features/pwa/utils/isIosDevice";
 import {
   dismissInstallHint,
-  isInstallHintDismissed,
-  subscribeToInstallHint,
-} from "@/features/pwa/utils/installHintStorage";
+  getCanPromptInstall,
+  getIsInstallHintDismissed,
+  promptInstall,
+  subscribeToInstallPrompt,
+} from "@/features/pwa/utils/installPromptStore";
 
 function subscribeToNothing(): () => void {
   return () => {};
@@ -28,10 +31,6 @@ function getServerTrue(): boolean {
   return true;
 }
 
-/**
- * iOS has no install prompt event, so Safari users get a manual
- * "Share → Add to Home Screen" hint until they install or dismiss it.
- */
 export function useInstallHint() {
   const isIos = useSyncExternalStore(
     subscribeToNothing,
@@ -39,14 +38,27 @@ export function useInstallHint() {
     getServerFalse,
   );
   const isStandalone = useIsStandalone();
+  const canPromptInstall = useSyncExternalStore(
+    subscribeToInstallPrompt,
+    getCanPromptInstall,
+    getServerFalse,
+  );
   const isDismissed = useSyncExternalStore(
-    subscribeToInstallHint,
-    isInstallHintDismissed,
+    subscribeToInstallPrompt,
+    getIsInstallHintDismissed,
     getServerTrue,
   );
 
+  let installMethod: InstallMethod | null = null;
+  if (!isStandalone) {
+    if (canPromptInstall) installMethod = "native-prompt";
+    else if (isIos) installMethod = "ios-manual";
+  }
+
   return {
-    isInstallHintVisible: isIos && !isStandalone && !isDismissed,
+    installMethod,
+    isInstallHintVisible: installMethod !== null && !isDismissed,
     dismissInstallHint,
+    promptInstall,
   };
 }
