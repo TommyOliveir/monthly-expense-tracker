@@ -11,6 +11,7 @@ import {
   APP_NAME,
   APP_SHORT_NAME,
 } from "@/features/pwa/appMetadata";
+import { InstallHintBanner } from "@/features/pwa/components/InstallHintBanner";
 import { OfflineBanner } from "@/features/pwa/components/OfflineBanner";
 import { ServiceWorkerRegistrar } from "@/features/pwa/components/ServiceWorkerRegistrar";
 
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <AuthProvider>
             <Navbar />
             <OfflineBanner />
+            <InstallHintBanner />
             {children}
             <Toaster position="top-center" />
             <ServiceWorkerRegistrar />
