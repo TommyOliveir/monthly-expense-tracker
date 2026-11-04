@@ -16,6 +16,7 @@ import {
   getCurrencySymbol,
 } from "@/lib/format";
 import { getErrorMessage } from "@/lib/getErrorMessage";
+import { useOnlineStatus } from "@/features/pwa/hooks/useOnlineStatus";
 import {
   getDefaultExpenseDate,
   getFirstDateOfMonth,
@@ -98,6 +99,7 @@ function AddExpenseFormContainer({
   onClose,
 }: AddExpenseFormContainerProps) {
   const { createExpense, isCreatingExpense } = useCreateExpense();
+  const isOnline = useOnlineStatus();
   const { playCoin } = useCoinSound();
 
   const [values, setValues] = useState<ExpenseFormValues>(() => ({
@@ -141,6 +143,10 @@ function AddExpenseFormContainer({
       return;
     }
 
+    // Don't queue the save: an offline save would wait in memory and be lost
+    // if the app closes. The user keeps their input and saves once online.
+    if (!isOnline) return;
+
     setSubmitError(null);
     createExpense(validation.payload, {
       onSuccess: () => {
@@ -168,6 +174,7 @@ function AddExpenseFormContainer({
           max: getLastDateOfMonth(period),
         }}
         isSubmitting={isCreatingExpense}
+        isOffline={!isOnline}
         submitError={submitError}
         onChange={handleChange}
         onSubmit={handleSubmit}

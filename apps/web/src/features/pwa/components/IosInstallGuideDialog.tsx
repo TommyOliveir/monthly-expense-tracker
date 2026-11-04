@@ -95,7 +95,9 @@ export function IosInstallGuideDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] gap-5 overflow-y-auto p-6 sm:max-w-md">
+      {/* minmax(0,1fr): without it the grid column grows to fit the long site
+          address and the dialog scrolls sideways on small phones. */}
+      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] gap-5 overflow-y-auto p-6 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
             Install {APP_NAME}
@@ -136,7 +138,7 @@ export function IosInstallGuideDialog({
           Using an app&apos;s built-in browser (like Messenger or Gmail)? Open
           this page in Safari first.
         </p>
-        <DialogFooter>
+        <DialogFooter className="-mx-6 -mb-6 px-6">
           <DialogClose render={<Button className="h-10 px-4" />}>
             Got it
           </DialogClose>

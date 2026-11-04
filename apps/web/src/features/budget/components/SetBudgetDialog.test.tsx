@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import { SetBudgetDialog } from "@/features/budget/components/SetBudgetDialog";
 import type { SetBudgetPayload } from "@/features/budget/types/budget";
@@ -11,14 +11,22 @@ type MutationCallbacks = {
 
 const setBudget =
   vi.fn<(payload: SetBudgetPayload, callbacks: MutationCallbacks) => void>();
+let isSettingBudget = false;
 const toastSuccess = vi.fn();
 
 vi.mock("@/features/budget/hooks/useSetBudget", () => ({
-  useSetBudget: () => ({ setBudget, isSettingBudget: false }),
+  useSetBudget: () => ({ setBudget, isSettingBudget }),
 }));
 vi.mock("sonner", () => ({
   toast: { success: (...args: unknown[]) => toastSuccess(...args) },
 }));
+
+function setConnection(isOnline: boolean) {
+  vi.spyOn(navigator, "onLine", "get").mockReturnValue(isOnline);
+  act(() => {
+    window.dispatchEvent(new Event(isOnline ? "online" : "offline"));
+  });
+}
 
 function renderDialog(currentBudget = 0) {
   const onOpenChange = vi.fn();
@@ -36,7 +44,48 @@ function renderDialog(currentBudget = 0) {
 }
 
 describe("SetBudgetDialog", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("offline", () => {
+    it("blocks saving while offline and keeps the typed amount", () => {
+      setConnection(false);
+      renderDialog();
+
+      expect(screen.getByText("You're offline")).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("Monthly budget"), {
+        target: { value: "2500" },
+      });
+      const saveButton = screen.getByRole("button", { name: "Save budget" });
+      expect(saveButton).toBeDisabled();
+
+      fireEvent.submit(saveButton.closest("form") as HTMLFormElement);
+      expect(setBudget).not.toHaveBeenCalled();
+
+      setConnection(true);
+
+      expect(screen.getByLabelText("Monthly budget")).toHaveValue("2500");
+      fireEvent.click(screen.getByRole("button", { name: "Save budget" }));
+      expect(setBudget).toHaveBeenCalledWith(
+        { amount: 2500, year: 2026, month: 12 },
+        expect.any(Object),
+      );
+    });
+
+    it("says it's waiting when a save is paused by a dropped connection", () => {
+      isSettingBudget = true;
+      setConnection(false);
+      renderDialog();
+
+      expect(
+        screen.getByRole("button", { name: "Waiting for connection…" }),
+      ).toBeDisabled();
+    });
+  });
+
   beforeEach(() => {
+    isSettingBudget = false;
     setBudget.mockReset();
     toastSuccess.mockReset();
   });

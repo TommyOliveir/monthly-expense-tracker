@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/input-group";
 import { Spinner } from "@/components/ui/spinner";
 import { CategorySelect } from "@/features/category/components/CategorySelect";
+import { OfflineSaveNotice } from "@/features/pwa/components/OfflineSaveNotice";
 import type { Category } from "@/features/category/types/category";
 import type {
   ExpenseFormErrors,
@@ -33,6 +34,7 @@ type ExpenseFormProps = {
   currencySymbol: string;
   dateRange: { min: string; max: string };
   isSubmitting: boolean;
+  isOffline: boolean;
   submitError: string | null;
   onChange: (field: ExpenseFormField, value: string) => void;
   onSubmit: () => void;
@@ -43,6 +45,12 @@ type ExpenseFormProps = {
 
 export function getExpenseFieldId(field: ExpenseFormField): string {
   return `expense-${field}`;
+}
+
+// A save started just before the connection dropped is paused, not failed.
+function getSubmitLabel(isSubmitting: boolean, isOffline: boolean): string {
+  if (!isSubmitting) return "Save expense";
+  return isOffline ? "Waiting for connection…" : "Saving…";
 }
 
 function getErrorId(field: ExpenseFormField): string {
@@ -58,6 +66,7 @@ export function ExpenseForm({
   currencySymbol,
   dateRange,
   isSubmitting,
+  isOffline,
   submitError,
   onChange,
   onSubmit,
@@ -193,6 +202,8 @@ export function ExpenseForm({
         </Alert>
       )}
 
+      {isOffline && <OfflineSaveNotice actionLabel="save this expense" />}
+
       {submitError && (
         <Alert variant="destructive">
           <CircleAlertIcon aria-hidden />
@@ -212,9 +223,13 @@ export function ExpenseForm({
         >
           Cancel
         </Button>
-        <Button type="submit" className="h-10 px-4" disabled={isSubmitting}>
+        <Button
+          type="submit"
+          className="h-10 px-4"
+          disabled={isSubmitting || isOffline}
+        >
           {isSubmitting && <Spinner aria-hidden />}
-          {isSubmitting ? "Saving…" : "Save expense"}
+          {getSubmitLabel(isSubmitting, isOffline)}
         </Button>
       </div>
     </form>

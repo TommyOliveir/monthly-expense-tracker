@@ -33,6 +33,8 @@ import {
   getCurrencySymbol,
 } from "@/lib/format";
 import { getErrorMessage } from "@/lib/getErrorMessage";
+import { OfflineSaveNotice } from "@/features/pwa/components/OfflineSaveNotice";
+import { useOnlineStatus } from "@/features/pwa/hooks/useOnlineStatus";
 import { parseAmount } from "@/lib/money";
 import type { YearMonth } from "@/lib/yearMonth";
 import { useSetBudget } from "@/features/budget/hooks/useSetBudget";
@@ -69,6 +71,12 @@ export function SetBudgetDialog({
   );
 }
 
+// A save started just before the connection dropped is paused, not failed.
+function getSubmitLabel(isSaving: boolean, isOnline: boolean): string {
+  if (!isSaving) return "Save budget";
+  return isOnline ? "Saving…" : "Waiting for connection…";
+}
+
 function SetBudgetForm({
   period,
   currentBudget,
@@ -77,6 +85,7 @@ function SetBudgetForm({
   onSaved,
 }: SetBudgetFormProps) {
   const { setBudget, isSettingBudget } = useSetBudget();
+  const isOnline = useOnlineStatus();
   const [amountInput, setAmountInput] = useState(
     currentBudget > 0 ? String(currentBudget) : "",
   );
@@ -95,6 +104,9 @@ function SetBudgetForm({
       setAmountError(parsed.error);
       return;
     }
+
+    // Same rule as adding an expense: never queue a save that could be lost.
+    if (!isOnline) return;
 
     setBudget(
       { amount: parsed.value, year: period.year, month: period.month },
@@ -157,6 +169,8 @@ function SetBudgetForm({
         )}
       </Field>
 
+      {!isOnline && <OfflineSaveNotice actionLabel="save the budget" />}
+
       {submitError && (
         <Alert variant="destructive">
           <CircleAlertIcon aria-hidden />
@@ -173,9 +187,13 @@ function SetBudgetForm({
         >
           Cancel
         </DialogClose>
-        <Button type="submit" className="h-10 px-4" disabled={isSettingBudget}>
+        <Button
+          type="submit"
+          className="h-10 px-4"
+          disabled={isSettingBudget || !isOnline}
+        >
           {isSettingBudget && <Spinner aria-hidden />}
-          {isSettingBudget ? "Saving…" : "Save budget"}
+          {getSubmitLabel(isSettingBudget, isOnline)}
         </Button>
       </DialogFooter>
     </form>

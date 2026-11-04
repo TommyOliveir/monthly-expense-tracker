@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import { getCurrentYearMonth, toLocalDateInputValue } from "@/lib/yearMonth";
 import { AddExpenseDialog } from "@/features/expense/components/AddExpenseDialog";
@@ -15,11 +15,12 @@ const createExpense =
   vi.fn<
     (payload: CreateExpensePayload, callbacks: MutationCallbacks) => void
   >();
+let isCreatingExpense = false;
 const playCoin = vi.fn();
 const toastSuccess = vi.fn();
 
 vi.mock("@/features/expense/hooks/useCreateExpense", () => ({
-  useCreateExpense: () => ({ createExpense, isCreatingExpense: false }),
+  useCreateExpense: () => ({ createExpense, isCreatingExpense }),
 }));
 vi.mock("@/hooks/use-coin-sound", () => ({
   useCoinSound: () => ({ playCoin }),
@@ -35,6 +36,13 @@ const categories = [
   makeCategory({ id: "cat-food", name: "Food" }),
   makeCategory({ id: "cat-rent", name: "Rent" }),
 ];
+
+function setConnection(isOnline: boolean) {
+  vi.spyOn(navigator, "onLine", "get").mockReturnValue(isOnline);
+  act(() => {
+    window.dispatchEvent(new Event(isOnline ? "online" : "offline"));
+  });
+}
 
 function renderDialog(
   overrides: Partial<Parameters<typeof AddExpenseDialog>[0]> = {},
@@ -62,7 +70,50 @@ function renderDialog(
 }
 
 describe("AddExpenseDialog", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("offline", () => {
+    it("blocks saving while offline and keeps what the user typed", () => {
+      setConnection(false);
+      const { dialog } = renderDialog();
+
+      expect(within(dialog).getByText("You're offline")).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("Amount"), {
+        target: { value: "42" },
+      });
+      fireEvent.change(screen.getByLabelText("Description"), {
+        target: { value: "Coffee" },
+      });
+      const saveButton = screen.getByRole("button", { name: "Save expense" });
+      expect(saveButton).toBeDisabled();
+
+      // Enter in a field submits the form even with the button disabled.
+      fireEvent.submit(saveButton.closest("form") as HTMLFormElement);
+      expect(createExpense).not.toHaveBeenCalled();
+
+      setConnection(true);
+
+      expect(within(dialog).queryByText("You're offline")).toBeNull();
+      expect(screen.getByLabelText("Description")).toHaveValue("Coffee");
+      fireEvent.click(screen.getByRole("button", { name: "Save expense" }));
+      expect(createExpense).toHaveBeenCalledTimes(1);
+    });
+
+    it("says it's waiting when a save is paused by a dropped connection", () => {
+      isCreatingExpense = true;
+      setConnection(false);
+      renderDialog();
+
+      expect(
+        screen.getByRole("button", { name: "Waiting for connection…" }),
+      ).toBeDisabled();
+    });
+  });
+
   beforeEach(() => {
+    isCreatingExpense = false;
     createExpense.mockReset();
     playCoin.mockReset();
     toastSuccess.mockReset();

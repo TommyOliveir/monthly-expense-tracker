@@ -35,9 +35,10 @@ export function SafariShareIllustration({
         )}
       >
         <ChevronLeftIcon className="size-4 shrink-0" />
-        <div className="flex min-w-0 flex-1 items-center justify-center gap-1 rounded-full bg-background px-3 py-1 text-xs text-foreground">
+        <div className="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden rounded-full bg-background px-3 py-1 text-xs text-foreground">
           <LockIcon className="size-3 shrink-0" />
-          <span className="truncate">{siteHost}</span>
+          {/* min-w-0: a flex item won't shrink below its text width otherwise. */}
+          <span className="min-w-0 truncate">{siteHost}</span>
         </div>
         <span className={HIGHLIGHT_CLASS}>
           <EllipsisIcon className="size-4" />
