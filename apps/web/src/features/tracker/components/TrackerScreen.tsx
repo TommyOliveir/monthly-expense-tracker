@@ -18,7 +18,7 @@ import { TrackerSkeleton } from "@/features/tracker/components/TrackerSkeleton";
 
 export function TrackerScreen() {
   const { user, isAuthenticated, isLoading } = useAuth();
-  const { currency } = useCurrency();
+  const { currency, setCurrency } = useCurrency();
 
   if (isLoading) return <TrackerSkeleton />;
 
@@ -50,5 +50,11 @@ export function TrackerScreen() {
 
   const firstName = user?.name?.trim().split(/\s+/)[0] || undefined;
 
-  return <TrackerDashboard firstName={firstName} currency={currency} />;
+  return (
+    <TrackerDashboard
+      firstName={firstName}
+      currency={currency}
+      onCurrencyChange={setCurrency}
+    />
+  );
 }

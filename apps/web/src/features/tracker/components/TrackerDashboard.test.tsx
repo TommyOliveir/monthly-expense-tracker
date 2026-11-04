@@ -16,6 +16,7 @@ type BudgetSummaryState = {
 };
 
 const setSelectedMonth = vi.fn();
+const onCurrencyChange = vi.fn();
 let selectedMonth: YearMonth = CURRENT_MONTH;
 let budgetState: BudgetSummaryState;
 
@@ -71,14 +72,18 @@ describe("TrackerDashboard", () => {
 
   it("shows a loading state while the month loads", () => {
     budgetState.isBudgetSummaryLoading = true;
-    render(<TrackerDashboard currency="USD" />);
+    render(
+      <TrackerDashboard currency="USD" onCurrencyChange={onCurrencyChange} />,
+    );
 
     expect(screen.getByRole("status")).toHaveTextContent("Loading your month…");
   });
 
   it("shows an error with a retry when the month fails to load", () => {
     budgetState.budgetSummaryError = new ApiError(500, "boom");
-    render(<TrackerDashboard currency="USD" />);
+    render(
+      <TrackerDashboard currency="USD" onCurrencyChange={onCurrencyChange} />,
+    );
 
     expect(screen.getByText("Couldn't load November 2026")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
@@ -87,7 +92,13 @@ describe("TrackerDashboard", () => {
 
   it("shows real empty states for a new month (no sample data)", () => {
     budgetState.budgetSummary = makeSummary();
-    render(<TrackerDashboard firstName="Tommy" currency="USD" />);
+    render(
+      <TrackerDashboard
+        firstName="Tommy"
+        currency="USD"
+        onCurrencyChange={onCurrencyChange}
+      />,
+    );
 
     expect(screen.getByText("Hi, Tommy")).toBeInTheDocument();
     expect(screen.getByText("No budget for November 2026")).toBeInTheDocument();
@@ -105,9 +116,16 @@ describe("TrackerDashboard", () => {
         makeExpense({ id: "2", name: "Coffee", amount: 12.5 }),
       ],
     });
-    render(<TrackerDashboard currency="PHP" />);
+    render(
+      <TrackerDashboard currency="PHP" onCurrencyChange={onCurrencyChange} />,
+    );
 
     expect(screen.getByText("₱687.50")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Currency: Philippine Peso. Change currency",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Groceries")).toBeInTheDocument();
     expect(
       screen.getByText("2 expenses", { selector: "[data-slot=card-action]" }),
@@ -117,7 +135,9 @@ describe("TrackerDashboard", () => {
 
   it("opens the add-expense dialog from the header", () => {
     budgetState.budgetSummary = makeSummary();
-    render(<TrackerDashboard currency="USD" />);
+    render(
+      <TrackerDashboard currency="USD" onCurrencyChange={onCurrencyChange} />,
+    );
 
     fireEvent.click(screen.getAllByRole("button", { name: "Add expense" })[0]);
     expect(screen.getByText("add-expense-dialog")).toBeInTheDocument();
@@ -125,7 +145,9 @@ describe("TrackerDashboard", () => {
 
   it("navigates between months", () => {
     budgetState.budgetSummary = makeSummary();
-    render(<TrackerDashboard currency="USD" />);
+    render(
+      <TrackerDashboard currency="USD" onCurrencyChange={onCurrencyChange} />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Previous month" }));
     expect(setSelectedMonth).toHaveBeenCalledWith({ year: 2026, month: 10 });
@@ -134,9 +156,14 @@ describe("TrackerDashboard", () => {
   it("makes past months read-only", () => {
     selectedMonth = { year: 2026, month: 9 };
     budgetState.budgetSummary = makeSummary({ month: 9 });
-    render(<TrackerDashboard currency="USD" />);
+    render(
+      <TrackerDashboard currency="USD" onCurrencyChange={onCurrencyChange} />,
+    );
 
     expect(screen.getByText("Past month · view only")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Currency: US Dollar/ }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Add expense" }),
     ).not.toBeInTheDocument();

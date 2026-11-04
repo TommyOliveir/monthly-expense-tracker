@@ -1,6 +1,8 @@
 import { LockIcon, PlusIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { CurrencyCode } from "@/features/currency/currencies";
+import { CurrencyPicker } from "@/features/currency/components/CurrencyPicker";
 import { MonthSwitcher } from "@/features/tracker/components/MonthSwitcher";
 
 type TrackerHeaderProps = {
@@ -8,6 +10,8 @@ type TrackerHeaderProps = {
   monthLabel: string;
   isCurrentMonth: boolean;
   isReadOnly: boolean;
+  currency: CurrencyCode;
+  onCurrencyChange: (currency: CurrencyCode) => void;
   onPreviousMonth: () => void;
   onNextMonth: () => void;
   onCurrentMonth: () => void;
@@ -19,6 +23,8 @@ export function TrackerHeader({
   monthLabel,
   isCurrentMonth,
   isReadOnly,
+  currency,
+  onCurrencyChange,
   onPreviousMonth,
   onNextMonth,
   onCurrentMonth,
@@ -48,15 +54,19 @@ export function TrackerHeader({
           </Badge>
         )}
       </div>
-      {!isReadOnly && (
-        <Button
-          className="hidden h-10 px-4 sm:inline-flex"
-          onClick={onAddExpense}
-        >
-          <PlusIcon aria-hidden />
-          Add expense
-        </Button>
-      )}
+      <div className="flex items-center gap-2 self-start sm:self-auto">
+        {/* Shown for past months too: currency is a display preference, not an edit. */}
+        <CurrencyPicker value={currency} onValueChange={onCurrencyChange} />
+        {!isReadOnly && (
+          <Button
+            className="hidden h-10 px-4 sm:inline-flex"
+            onClick={onAddExpense}
+          >
+            <PlusIcon aria-hidden />
+            Add expense
+          </Button>
+        )}
+      </div>
     </header>
   );
 }

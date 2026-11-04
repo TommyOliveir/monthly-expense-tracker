@@ -36,11 +36,13 @@ import { useSelectedMonth } from "@/features/tracker/hooks/useSelectedMonth";
 type TrackerDashboardProps = {
   firstName?: string;
   currency: CurrencyCode;
+  onCurrencyChange: (currency: CurrencyCode) => void;
 };
 
 export function TrackerDashboard({
   firstName,
   currency,
+  onCurrencyChange,
 }: TrackerDashboardProps) {
   const { selectedMonth, currentMonth, setSelectedMonth } = useSelectedMonth();
   const {
@@ -171,6 +173,8 @@ export function TrackerDashboard({
         monthLabel={monthLabel}
         isCurrentMonth={monthComparison === 0}
         isReadOnly={isReadOnly}
+        currency={currency}
+        onCurrencyChange={onCurrencyChange}
         onPreviousMonth={() =>
           setSelectedMonth(shiftYearMonth(selectedMonth, -1))
         }

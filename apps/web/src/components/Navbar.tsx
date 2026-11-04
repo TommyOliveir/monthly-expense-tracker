@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CoinsIcon, LogOutIcon } from "lucide-react";
+import { LogOutIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -12,16 +12,11 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { useLogout } from "@/features/auth/hooks/useLogout";
-import { CurrencyMenuItems } from "@/features/currency/components/CurrencyMenuItems";
-import { useCurrency } from "@/features/currency/hooks/useCurrency";
 
 const APP_LINKS = [
   { href: "/tracker", label: "Tracker" },
@@ -31,7 +26,6 @@ const APP_LINKS = [
 export default function Navbar() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { logout, isLoggingOut } = useLogout();
-  const { currency, setCurrency } = useCurrency();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -132,22 +126,6 @@ export default function Navbar() {
                     ))}
                     <DropdownMenuSeparator />
                   </DropdownMenuGroup>
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger className="h-9">
-                      <CoinsIcon aria-hidden />
-                      Currency
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        {currency}
-                      </span>
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="w-56">
-                      <CurrencyMenuItems
-                        value={currency}
-                        onValueChange={setCurrency}
-                      />
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     variant="destructive"
                     className="h-9"
