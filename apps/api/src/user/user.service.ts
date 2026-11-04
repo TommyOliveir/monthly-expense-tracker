@@ -51,9 +51,11 @@ export class UserService {
     });
   }
 
+  // Case-insensitive so accounts created before emails were lowercased still match.
   async findByEmail(email: string) {
-    return this.prisma.user.findUnique({
-      where: { email },
+    return this.prisma.user.findFirst({
+      where: { email: { equals: email.trim(), mode: 'insensitive' } },
+      orderBy: { createdAt: 'asc' },
     });
   }
 

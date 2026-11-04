@@ -4,12 +4,38 @@ type TokenListener = (tokens: AuthTokens | null) => void;
 
 const STORAGE_KEY = "session";
 
+// Safari throws on localStorage access when "Block All Cookies" is on. The
+// session then lives in memory only instead of crashing login.
+function readStorage(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(value: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, value);
+  } catch (error) {
+    console.warn("Could not persist the session:", error);
+  }
+}
+
+function removeStorage(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Nothing persisted, nothing to remove.
+  }
+}
+
 function getInitialTokens(): AuthTokens | null {
   if (typeof window === "undefined") {
     return null;
   }
 
-  const storedToken = localStorage.getItem(STORAGE_KEY);
+  const storedToken = readStorage();
 
   if (!storedToken) {
     return null;
@@ -18,7 +44,7 @@ function getInitialTokens(): AuthTokens | null {
   try {
     return JSON.parse(storedToken) as AuthTokens;
   } catch {
-    localStorage.removeItem(STORAGE_KEY);
+    removeStorage();
     return null;
   }
 }
@@ -53,7 +79,7 @@ if (typeof window !== "undefined") {
       try {
         newTokens = JSON.parse(event.newValue) as AuthTokens;
       } catch {
-        localStorage.removeItem(STORAGE_KEY);
+        removeStorage();
         newTokens = null;
       }
     }
@@ -80,7 +106,7 @@ export function setTokens(newTokens: AuthTokens): void {
   tokens = newTokens;
 
   if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newTokens));
+    writeStorage(JSON.stringify(newTokens));
   }
 
   listeners.forEach((listener) => {
@@ -96,7 +122,7 @@ export function clearTokens(): void {
   tokens = null;
 
   if (typeof window !== "undefined") {
-    localStorage.removeItem(STORAGE_KEY);
+    removeStorage();
   }
 
   listeners.forEach((listener) => {

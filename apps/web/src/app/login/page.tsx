@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useLogin } from "@/features/auth/hooks/useLogin";
 import { useSignup } from "@/features/auth/hooks/useSignup";
+import { getErrorMessage } from "@/lib/getErrorMessage";
 
 export function AuthPageContent() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export function AuthPageContent() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const modeFromUrl =
     searchParams.get("mode") === "register" ? "register" : "login";
 
@@ -60,6 +62,7 @@ export function AuthPageContent() {
     if (formErrors[name]) {
       setFormErrors((prev) => ({ ...prev, [name]: null }));
     }
+    setSubmitError(null);
   };
 
   if (prevModeFromUrl !== modeFromUrl) {
@@ -100,13 +103,15 @@ export function AuthPageContent() {
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (!formData.email) errors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(formData.email))
+    const email = formData.email.trim();
+    if (!email) errors.email = "Email is required";
+    else if (!/\S+@\S+\.\S+/.test(email))
       errors.email = "Invalid email address";
 
+    const minPasswordLength = authMode === "register" ? 8 : 6;
     if (!formData.password) errors.password = "Password is required";
-    else if (formData.password.length < 6)
-      errors.password = "Must be at least 6 characters";
+    else if (formData.password.length < minPasswordLength)
+      errors.password = `Must be at least ${minPasswordLength} characters`;
 
     if (authMode === "register") {
       if (!formData.name.trim()) errors.name = "Full name is required";
@@ -122,41 +127,34 @@ export function AuthPageContent() {
     return Object.keys(errors).length === 0;
   };
 
-  // 3. Updated Submit Handler with Redirects
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!validateForm()) return;
 
     setIsLoading(true);
+    setSubmitError(null);
+    const email = formData.email.trim();
 
     try {
       if (authMode === "register") {
         await signup({
-          name: formData.name,
-          email: formData.email,
+          name: formData.name.trim(),
+          email,
           password: formData.password,
         });
-
         showNotification(
-          `Welcome aboard, ${formData.name}! Redirecting to tracker...`,
+          `Welcome aboard, ${formData.name.trim()}! Redirecting to tracker...`,
         );
-
-        // Redirect to /tracker after successful signup
-        router.push("/tracker");
       } else {
-        await login({
-          email: formData.email,
-          password: formData.password,
-        });
-
-        showNotification(`Welcome back! Authenticated as ${formData.email}.`);
-
-        // Redirect to /tracker after successful login
-        router.push("/tracker");
+        await login({ email, password: formData.password });
+        showNotification(`Welcome back! Authenticated as ${email}.`);
       }
-    } catch (err) {
-      console.error("Authentication failed:", err);
-      showNotification("Authentication failed. Please check your details.");
+
+      // Only reached once the API accepted the credentials and tokens are stored.
+      router.push("/tracker");
+    } catch (error) {
+      console.error("Authentication failed:", error);
+      setSubmitError(getErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -222,6 +220,7 @@ export function AuthPageContent() {
               onClick={() => {
                 setAuthMode("login");
                 setFormErrors({});
+                setSubmitError(null);
               }}
               className={`py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 authMode === "login"
@@ -236,6 +235,7 @@ export function AuthPageContent() {
               onClick={() => {
                 setAuthMode("register");
                 setFormErrors({});
+                setSubmitError(null);
               }}
               className={`py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 authMode === "register"
@@ -262,12 +262,13 @@ export function AuthPageContent() {
                     id="name"
                     name="name"
                     type="text"
+                    autoComplete="name"
                     value={formData.name}
                     onChange={handleInputChange}
                     placeholder="Eleanor Vance"
                     className={`w-full rounded-xl border ${
                       formErrors.name ? "border-red-500" : "border-[#2c2115]/20"
-                    } bg-[#faf5ec] py-3 pl-10 pr-4 text-sm text-[#2c2115] outline-none transition placeholder:text-[#8a7a63]/60 focus:border-[#c96f4a] focus:ring-2 focus:ring-[#c96f4a]/25`}
+                    } bg-[#faf5ec] py-3 pl-10 pr-4 text-base sm:text-sm text-[#2c2115] outline-none transition placeholder:text-[#8a7a63]/60 focus:border-[#c96f4a] focus:ring-2 focus:ring-[#c96f4a]/25`}
                   />
                 </div>
                 {formErrors.name && (
@@ -291,12 +292,17 @@ export function AuthPageContent() {
                   id="email"
                   name="email"
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={formData.email}
                   onChange={handleInputChange}
                   placeholder="eleanor@example.com"
                   className={`w-full rounded-xl border ${
                     formErrors.email ? "border-red-500" : "border-[#2c2115]/20"
-                  } bg-[#faf5ec] py-3 pl-10 pr-4 text-sm text-[#2c2115] outline-none transition placeholder:text-[#8a7a63]/60 focus:border-[#c96f4a] focus:ring-2 focus:ring-[#c96f4a]/25`}
+                  } bg-[#faf5ec] py-3 pl-10 pr-4 text-base sm:text-sm text-[#2c2115] outline-none transition placeholder:text-[#8a7a63]/60 focus:border-[#c96f4a] focus:ring-2 focus:ring-[#c96f4a]/25`}
                 />
               </div>
               {formErrors.email && (
@@ -334,6 +340,12 @@ export function AuthPageContent() {
                   id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete={
+                    authMode === "login" ? "current-password" : "new-password"
+                  }
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={formData.password}
                   onChange={handleInputChange}
                   placeholder="••••••••••••"
@@ -341,11 +353,12 @@ export function AuthPageContent() {
                     formErrors.password
                       ? "border-red-500"
                       : "border-[#2c2115]/20"
-                  } bg-[#faf5ec] py-3 pl-10 pr-11 text-sm text-[#2c2115] outline-none transition placeholder:text-[#8a7a63]/60 focus:border-[#c96f4a] focus:ring-2 focus:ring-[#c96f4a]/25`}
+                  } bg-[#faf5ec] py-3 pl-10 pr-11 text-base sm:text-sm text-[#2c2115] outline-none transition placeholder:text-[#8a7a63]/60 focus:border-[#c96f4a] focus:ring-2 focus:ring-[#c96f4a]/25`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8a7a63] hover:text-[#2c2115] transition"
                 >
                   {showPassword ? (
@@ -395,6 +408,10 @@ export function AuthPageContent() {
                     id="confirmPassword"
                     name="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
                     placeholder="••••••••••••"
@@ -402,11 +419,14 @@ export function AuthPageContent() {
                       formErrors.confirmPassword
                         ? "border-red-500"
                         : "border-[#2c2115]/20"
-                    } bg-[#faf5ec] py-3 pl-10 pr-11 text-sm text-[#2c2115] outline-none transition placeholder:text-[#8a7a63]/60 focus:border-[#c96f4a] focus:ring-2 focus:ring-[#c96f4a]/25`}
+                    } bg-[#faf5ec] py-3 pl-10 pr-11 text-base sm:text-sm text-[#2c2115] outline-none transition placeholder:text-[#8a7a63]/60 focus:border-[#c96f4a] focus:ring-2 focus:ring-[#c96f4a]/25`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={
+                      showConfirmPassword ? "Hide password" : "Show password"
+                    }
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8a7a63] hover:text-[#2c2115] transition"
                   >
                     {showConfirmPassword ? (
@@ -457,6 +477,16 @@ export function AuthPageContent() {
                 </p>
               )}
             </div>
+
+            {submitError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-50 px-3 py-2.5 text-sm text-red-700"
+              >
+                <AlertCircle aria-hidden className="mt-0.5 w-4 h-4 shrink-0" />
+                <span>{submitError}</span>
+              </div>
+            )}
 
             <div className="pt-2">
               <button

@@ -9,7 +9,7 @@ export function useSignup() {
   const { signup: signupFromContext } = useAuth();
 
   const {
-    mutate: signup,
+    mutateAsync: signup,
     isPending: isSigningUp,
     error: signupError,
     data: signupData,

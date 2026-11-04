@@ -27,6 +27,8 @@ import type { CurrencyCode } from "@/features/currency/currencies";
 import { AddExpenseDialog } from "@/features/expense/components/AddExpenseDialog";
 import { ExpenseList } from "@/features/expense/components/ExpenseList";
 import { groupExpensesByDay } from "@/features/expense/utils/groupExpensesByDay";
+import { InstallHint } from "@/features/pwa/components/InstallHint";
+import { useInstallHint } from "@/features/pwa/hooks/useInstallHint";
 import { AddExpenseBar } from "@/features/tracker/components/AddExpenseBar";
 import { StatCard } from "@/features/tracker/components/StatCard";
 import { TrackerHeader } from "@/features/tracker/components/TrackerHeader";
@@ -57,6 +59,8 @@ export function TrackerDashboard({
     categoriesError,
     refetchCategories,
   } = useCategories();
+
+  const { isInstallHintVisible, dismissInstallHint } = useInstallHint();
 
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
@@ -168,6 +172,8 @@ export function TrackerDashboard({
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 pt-6 pb-28 sm:px-6 sm:pt-8 sm:pb-12 lg:px-8">
+      {isInstallHintVisible && <InstallHint onDismiss={dismissInstallHint} />}
+
       <TrackerHeader
         firstName={firstName}
         monthLabel={monthLabel}

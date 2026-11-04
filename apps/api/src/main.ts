@@ -3,16 +3,14 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
+import { getAllowedOrigins } from '@/common/cors/get-allowed-origins';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // 1. Configure CORS
   app.enableCors({
-    origin: [
-      'http://localhost:3000', // Local Next.js dev server
-      process.env.FRONTEND_URL || '', // Deployed Next.js URL on Vercel/Render
-    ].filter(Boolean),
+    origin: getAllowedOrigins(process.env.FRONTEND_URL),
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true, // Allows authorization headers / cookies
     allowedHeaders: ['Content-Type', 'Authorization'],
