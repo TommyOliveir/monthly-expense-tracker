@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import { InstallHintBanner } from "@/features/pwa/components/InstallHintBanner";
@@ -24,6 +30,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 describe("InstallHintBanner", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     installMethod = "ios-manual";
     isInstallHintVisible = true;
@@ -37,6 +44,22 @@ describe("InstallHintBanner", () => {
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveTextContent("Add to Home Screen");
     expect(promptInstall).not.toHaveBeenCalled();
+  });
+
+  it("leads with the ⋯ menu on Safari 26 (e.g. an iPhone 11 Pro on iOS 26)", async () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1",
+    );
+    render(<InstallHintBanner />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show me how" }));
+
+    const [shareStep] = within(await screen.findByRole("dialog")).getAllByRole(
+      "listitem",
+    );
+    expect(shareStep).toHaveTextContent(
+      "Tap the ⋯ button on the right of the address bar",
+    );
   });
 
   it("opens the browser's install prompt where supported", async () => {
