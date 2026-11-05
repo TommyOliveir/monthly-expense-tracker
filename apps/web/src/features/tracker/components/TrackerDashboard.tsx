@@ -25,7 +25,9 @@ import { useCategories } from "@/features/category/hooks/useCategories";
 import { buildCategoryBreakdown } from "@/features/category/utils/buildCategoryBreakdown";
 import type { CurrencyCode } from "@/features/currency/currencies";
 import { AddExpenseDialog } from "@/features/expense/components/AddExpenseDialog";
+import { EditExpenseDialog } from "@/features/expense/components/EditExpenseDialog";
 import { ExpenseList } from "@/features/expense/components/ExpenseList";
+import type { ExpenseWithCategory } from "@/features/expense/types/expense";
 import { groupExpensesByDay } from "@/features/expense/utils/groupExpensesByDay";
 import { AddExpenseBar } from "@/features/tracker/components/AddExpenseBar";
 import { StatCard } from "@/features/tracker/components/StatCard";
@@ -60,6 +62,8 @@ export function TrackerDashboard({
 
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] =
+    useState<ExpenseWithCategory | null>(null);
 
   const monthComparison = compareYearMonth(selectedMonth, currentMonth);
   const isReadOnly = monthComparison < 0;
@@ -153,6 +157,8 @@ export function TrackerDashboard({
               ? `Nothing was recorded in ${monthLabel}.`
               : "Add your first expense to start tracking this month."
           }
+          // Past months are a fixed record, like adding: no edit or delete.
+          onSelectExpense={isReadOnly ? undefined : setEditingExpense}
           emptyAction={
             isReadOnly ? undefined : (
               <Button className="h-10 px-4" onClick={openExpenseDialog}>
@@ -193,6 +199,20 @@ export function TrackerDashboard({
             onOpenChange={setIsExpenseDialogOpen}
             period={selectedMonth}
             currency={currency}
+            onCurrencyChange={onCurrencyChange}
+            categories={categories}
+            isCategoriesLoading={isCategoriesLoading}
+            categoriesError={
+              categoriesError ? getErrorMessage(categoriesError) : null
+            }
+            onRetryCategories={() => refetchCategories()}
+          />
+          <EditExpenseDialog
+            expense={editingExpense}
+            onClose={() => setEditingExpense(null)}
+            period={selectedMonth}
+            currency={currency}
+            onCurrencyChange={onCurrencyChange}
             categories={categories}
             isCategoriesLoading={isCategoriesLoading}
             categoriesError={

@@ -20,7 +20,8 @@ export const ENDPOINTS = {
   expenses: {
     list: "/expense",
     create: "/expense",
-    delete: "/not yet",
+    update: (id: string) => `/expense/${id}`,
+    delete: (id: string) => `/expense/${id}`,
   },
   comments: {
     list: (postId: string) => `/posts/${postId}/comments`,

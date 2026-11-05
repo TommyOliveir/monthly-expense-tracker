@@ -10,11 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCoinSound } from "@/hooks/use-coin-sound";
-import {
-  formatCurrency,
-  formatMonthLabel,
-  getCurrencySymbol,
-} from "@/lib/format";
+import { formatCurrency, formatMonthLabel } from "@/lib/format";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 import { useOnlineStatus } from "@/features/pwa/hooks/useOnlineStatus";
 import {
@@ -26,23 +22,16 @@ import {
 import { ManageCategoriesDialog } from "@/features/category/components/ManageCategoriesDialog";
 import type { Category } from "@/features/category/types/category";
 import type { CurrencyCode } from "@/features/currency/currencies";
-import {
-  ExpenseForm,
-  getExpenseFieldId,
-} from "@/features/expense/components/ExpenseForm";
+import { ExpenseForm } from "@/features/expense/components/ExpenseForm";
 import { useCreateExpense } from "@/features/expense/hooks/useCreateExpense";
-import type {
-  ExpenseFormErrors,
-  ExpenseFormField,
-  ExpenseFormValues,
-} from "@/features/expense/types/expenseForm";
-import { validateExpenseForm } from "@/features/expense/utils/validateExpenseForm";
+import { useExpenseFormState } from "@/features/expense/hooks/useExpenseFormState";
 
 type AddExpenseDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   period: YearMonth;
   currency: CurrencyCode;
+  onCurrencyChange: (currency: CurrencyCode) => void;
   categories: Category[];
   isCategoriesLoading: boolean;
   categoriesError: string | null;
@@ -55,13 +44,6 @@ type AddExpenseFormContainerProps = Omit<
 > & {
   onClose: () => void;
 };
-
-const FIELD_ORDER: ExpenseFormField[] = [
-  "amount",
-  "name",
-  "categoryId",
-  "date",
-];
 
 export function AddExpenseDialog({
   open,
@@ -92,6 +74,7 @@ export function AddExpenseDialog({
 function AddExpenseFormContainer({
   period,
   currency,
+  onCurrencyChange,
   categories,
   isCategoriesLoading,
   categoriesError,
@@ -102,57 +85,41 @@ function AddExpenseFormContainer({
   const isOnline = useOnlineStatus();
   const { playCoin } = useCoinSound();
 
-  const [values, setValues] = useState<ExpenseFormValues>(() => ({
-    name: "",
-    amount: "",
-    categoryId: "",
-    date: getDefaultExpenseDate(period),
-  }));
-  const [errors, setErrors] = useState<ExpenseFormErrors>({});
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const {
+    formValues,
+    errors,
+    submitError,
+    setSubmitError,
+    handleChange,
+    validate,
+  } = useExpenseFormState({
+    initialValues: () => ({
+      name: "",
+      amount: "",
+      categoryId: "",
+      date: getDefaultExpenseDate(period),
+    }),
+    categories,
+    period,
+    // Pre-select the first category so the common case needs no extra click.
+    fallbackToFirstCategory: true,
+  });
   const [isManagingCategories, setIsManagingCategories] = useState(false);
 
-  // Fall back to the first category so the common case needs no extra click,
-  // including when categories finish loading after the dialog opened.
-  const selectedCategoryId =
-    values.categoryId &&
-    categories.some((category) => category.id === values.categoryId)
-      ? values.categoryId
-      : (categories[0]?.id ?? "");
-  const formValues = { ...values, categoryId: selectedCategoryId };
-
-  const handleChange = (field: ExpenseFormField, value: string) => {
-    setValues((previous) => ({ ...previous, [field]: value }));
-    setErrors((previous) => ({ ...previous, [field]: undefined }));
-    setSubmitError(null);
-  };
-
   const handleSubmit = () => {
-    const validation = validateExpenseForm(formValues, {
-      categoryIds: categories.map((category) => category.id),
-      period,
-    });
-
-    if (!validation.ok) {
-      setErrors(validation.errors);
-      const firstInvalidField = FIELD_ORDER.find(
-        (field) => validation.errors[field],
-      );
-      if (firstInvalidField)
-        document.getElementById(getExpenseFieldId(firstInvalidField))?.focus();
-      return;
-    }
+    const payload = validate();
+    if (!payload) return;
 
     // Don't queue the save: an offline save would wait in memory and be lost
     // if the app closes. The user keeps their input and saves once online.
     if (!isOnline) return;
 
     setSubmitError(null);
-    createExpense(validation.payload, {
+    createExpense(payload, {
       onSuccess: () => {
         playCoin();
         toast.success("Expense added", {
-          description: `${validation.payload.name} · ${formatCurrency(validation.payload.amount, currency)}`,
+          description: `${payload.name} · ${formatCurrency(payload.amount, currency)}`,
         });
         onClose();
       },
@@ -168,7 +135,7 @@ function AddExpenseFormContainer({
         categories={categories}
         isCategoriesLoading={isCategoriesLoading}
         categoriesError={categoriesError}
-        currencySymbol={getCurrencySymbol(currency)}
+        currency={currency}
         dateRange={{
           min: getFirstDateOfMonth(period),
           max: getLastDateOfMonth(period),
@@ -177,6 +144,7 @@ function AddExpenseFormContainer({
         isOffline={!isOnline}
         submitError={submitError}
         onChange={handleChange}
+        onCurrencyChange={onCurrencyChange}
         onSubmit={handleSubmit}
         onCancel={onClose}
         onManageCategories={() => setIsManagingCategories(true)}

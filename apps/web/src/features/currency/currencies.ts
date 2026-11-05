@@ -17,3 +17,10 @@ export const DEFAULT_CURRENCY: CurrencyCode = "USD";
 export function isCurrencyCode(value: unknown): value is CurrencyCode {
   return SUPPORTED_CURRENCIES.some((currency) => currency.code === value);
 }
+
+export function getCurrencyName(code: CurrencyCode): string {
+  return (
+    SUPPORTED_CURRENCIES.find((currency) => currency.code === code)?.name ??
+    code
+  );
+}

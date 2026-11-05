@@ -1,5 +1,5 @@
-import type { FormEvent } from "react";
-import { CircleAlertIcon, Settings2Icon } from "lucide-react";
+import { type FormEvent, useRef } from "react";
+import { CircleAlertIcon, Settings2Icon, Trash2Icon } from "lucide-react";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,16 +9,13 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText,
-} from "@/components/ui/input-group";
+import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
 import { Spinner } from "@/components/ui/spinner";
 import { CategorySelect } from "@/features/category/components/CategorySelect";
 import { OfflineSaveNotice } from "@/features/pwa/components/OfflineSaveNotice";
 import type { Category } from "@/features/category/types/category";
+import { CurrencyInputAddon } from "@/features/currency/components/CurrencyInputAddon";
+import type { CurrencyCode } from "@/features/currency/currencies";
 import type {
   ExpenseFormErrors,
   ExpenseFormField,
@@ -31,12 +28,19 @@ type ExpenseFormProps = {
   categories: Category[];
   isCategoriesLoading: boolean;
   categoriesError: string | null;
-  currencySymbol: string;
+  currency: CurrencyCode;
   dateRange: { min: string; max: string };
   isSubmitting: boolean;
   isOffline: boolean;
   submitError: string | null;
+  /** Idle label of the submit button. */
+  submitLabel?: string;
+  /** Shows a Delete button when set (edit mode). */
+  onDelete?: () => void;
+  isDeleting?: boolean;
+  deleteError?: string | null;
   onChange: (field: ExpenseFormField, value: string) => void;
+  onCurrencyChange: (currency: CurrencyCode) => void;
   onSubmit: () => void;
   onCancel: () => void;
   onManageCategories: () => void;
@@ -48,8 +52,12 @@ export function getExpenseFieldId(field: ExpenseFormField): string {
 }
 
 // A save started just before the connection dropped is paused, not failed.
-function getSubmitLabel(isSubmitting: boolean, isOffline: boolean): string {
-  if (!isSubmitting) return "Save expense";
+function getSubmitLabel(
+  idleLabel: string,
+  isSubmitting: boolean,
+  isOffline: boolean,
+): string {
+  if (!isSubmitting) return idleLabel;
   return isOffline ? "Waiting for connection…" : "Saving…";
 }
 
@@ -63,17 +71,25 @@ export function ExpenseForm({
   categories,
   isCategoriesLoading,
   categoriesError,
-  currencySymbol,
+  currency,
   dateRange,
   isSubmitting,
   isOffline,
   submitError,
+  submitLabel = "Save expense",
+  onDelete,
+  isDeleting = false,
+  deleteError = null,
   onChange,
+  onCurrencyChange,
   onSubmit,
   onCancel,
   onManageCategories,
   onRetryCategories,
 }: ExpenseFormProps) {
+  const amountInputRef = useRef<HTMLInputElement>(null);
+  const isBusy = isSubmitting || isDeleting;
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSubmit();
@@ -90,10 +106,13 @@ export function ExpenseForm({
         <Field data-invalid={errors.amount ? true : undefined}>
           <FieldLabel htmlFor={getExpenseFieldId("amount")}>Amount</FieldLabel>
           <InputGroup className="h-11">
-            <InputGroupAddon>
-              <InputGroupText>{currencySymbol}</InputGroupText>
-            </InputGroupAddon>
+            <CurrencyInputAddon
+              value={currency}
+              onValueChange={onCurrencyChange}
+              inputRef={amountInputRef}
+            />
             <InputGroupInput
+              ref={amountInputRef}
               id={getExpenseFieldId("amount")}
               inputMode="decimal"
               autoComplete="off"
@@ -202,7 +221,11 @@ export function ExpenseForm({
         </Alert>
       )}
 
-      {isOffline && <OfflineSaveNotice actionLabel="save this expense" />}
+      {isOffline && (
+        <OfflineSaveNotice
+          actionLabel={onDelete ? "change this expense" : "save this expense"}
+        />
+      )}
 
       {submitError && (
         <Alert variant="destructive">
@@ -213,23 +236,46 @@ export function ExpenseForm({
         </Alert>
       )}
 
+      {deleteError && (
+        <Alert variant="destructive">
+          <CircleAlertIcon aria-hidden />
+          <AlertDescription>
+            Couldn&apos;t delete the expense. {deleteError}
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="-mx-6 -mb-6 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 px-6 sm:flex-row sm:justify-end">
+        {onDelete && (
+          // Last in the stacked mobile layout, far left on wider screens,
+          // so it is never the button under the thumb by default.
+          <Button
+            type="button"
+            variant="destructive"
+            className="h-10 px-4 sm:mr-auto"
+            onClick={onDelete}
+            disabled={isBusy || isOffline}
+          >
+            {isDeleting ? <Spinner aria-hidden /> : <Trash2Icon aria-hidden />}
+            {isDeleting ? "Deleting…" : "Delete"}
+          </Button>
+        )}
         <Button
           type="button"
           variant="outline"
           className="h-10 px-4"
           onClick={onCancel}
-          disabled={isSubmitting}
+          disabled={isBusy}
         >
           Cancel
         </Button>
         <Button
           type="submit"
           className="h-10 px-4"
-          disabled={isSubmitting || isOffline}
+          disabled={isBusy || isOffline}
         >
           {isSubmitting && <Spinner aria-hidden />}
-          {getSubmitLabel(isSubmitting, isOffline)}
+          {getSubmitLabel(submitLabel, isSubmitting, isOffline)}
         </Button>
       </div>
     </form>

@@ -4,18 +4,14 @@ import { ChevronDownIcon, CoinsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getCurrencySymbol } from "@/lib/format";
 import {
   type CurrencyCode,
-  SUPPORTED_CURRENCIES,
+  getCurrencyName,
 } from "@/features/currency/currencies";
-import { CurrencyMenuItems } from "@/features/currency/components/CurrencyMenuItems";
+import { CurrencyMenuContent } from "@/features/currency/components/CurrencyMenuContent";
 
 type CurrencyPickerProps = {
   value: CurrencyCode;
@@ -23,10 +19,6 @@ type CurrencyPickerProps = {
 };
 
 export function CurrencyPicker({ value, onValueChange }: CurrencyPickerProps) {
-  const currencyName =
-    SUPPORTED_CURRENCIES.find((currency) => currency.code === value)?.name ??
-    value;
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -34,7 +26,7 @@ export function CurrencyPicker({ value, onValueChange }: CurrencyPickerProps) {
           <Button
             variant="outline"
             className="h-10 gap-1.5 px-3"
-            aria-label={`Currency: ${currencyName}. Change currency`}
+            aria-label={`Currency: ${getCurrencyName(value)}. Change currency`}
           />
         }
       >
@@ -45,20 +37,7 @@ export function CurrencyPicker({ value, onValueChange }: CurrencyPickerProps) {
         <span className="font-medium tabular-nums">{value}</span>
         <ChevronDownIcon aria-hidden className="text-muted-foreground" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="flex flex-col gap-0.5 py-1.5">
-            <span className="text-sm font-medium text-foreground">
-              Display currency
-            </span>
-            <span className="text-xs font-normal text-muted-foreground">
-              Changes how amounts are shown. Amounts aren&apos;t converted.
-            </span>
-          </DropdownMenuLabel>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <CurrencyMenuItems value={value} onValueChange={onValueChange} />
-      </DropdownMenuContent>
+      <CurrencyMenuContent value={value} onValueChange={onValueChange} />
     </DropdownMenu>
   );
 }

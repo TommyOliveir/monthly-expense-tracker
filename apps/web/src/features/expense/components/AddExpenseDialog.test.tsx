@@ -1,6 +1,16 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
+import { formatCurrency } from "@/lib/format";
+import type { CurrencyCode } from "@/features/currency/currencies";
 import { getCurrentYearMonth, toLocalDateInputValue } from "@/lib/yearMonth";
 import { AddExpenseDialog } from "@/features/expense/components/AddExpenseDialog";
 import type { CreateExpensePayload } from "@/features/expense/types/expense";
@@ -44,9 +54,37 @@ function setConnection(isOnline: boolean) {
   });
 }
 
-function renderDialog(
-  overrides: Partial<Parameters<typeof AddExpenseDialog>[0]> = {},
-) {
+type AddExpenseDialogProps = Parameters<typeof AddExpenseDialog>[0];
+
+type DialogWithCurrencyStateProps = Omit<
+  AddExpenseDialogProps,
+  "currency" | "onCurrencyChange"
+> & {
+  initialCurrency: CurrencyCode;
+  onCurrencyChange: (currency: CurrencyCode) => void;
+};
+
+// Mirrors the tracker: the dialog reads and writes one app-wide currency.
+function DialogWithCurrencyState({
+  initialCurrency,
+  onCurrencyChange,
+  ...props
+}: DialogWithCurrencyStateProps) {
+  const [currency, setCurrency] = useState(initialCurrency);
+
+  return (
+    <AddExpenseDialog
+      {...props}
+      currency={currency}
+      onCurrencyChange={(next) => {
+        onCurrencyChange(next);
+        setCurrency(next);
+      }}
+    />
+  );
+}
+
+function renderDialog(overrides: Partial<AddExpenseDialogProps> = {}) {
   const onOpenChange = vi.fn();
   const onRetryCategories = vi.fn();
   render(
@@ -55,6 +93,7 @@ function renderDialog(
       onOpenChange={onOpenChange}
       period={getCurrentYearMonth()}
       currency="PHP"
+      onCurrencyChange={vi.fn()}
       categories={categories}
       isCategoriesLoading={false}
       categoriesError={null}
@@ -149,6 +188,60 @@ describe("AddExpenseDialog", () => {
       description: "Groceries · ₱1,250.50",
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("changes the app-wide currency from the amount input", async () => {
+    const onCurrencyChange = vi.fn();
+    render(
+      <DialogWithCurrencyState
+        open
+        onOpenChange={vi.fn()}
+        period={getCurrentYearMonth()}
+        initialCurrency="PHP"
+        onCurrencyChange={onCurrencyChange}
+        categories={categories}
+        isCategoriesLoading={false}
+        categoriesError={null}
+        onRetryCategories={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Currency: Philippine Peso. Change currency",
+      }),
+    );
+    expect(
+      await screen.findByText(
+        "Changes how amounts are shown. Amounts aren't converted.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("menuitemradio", { name: /Hungarian Forint/ }),
+    );
+
+    expect(onCurrencyChange).toHaveBeenCalledWith("HUF");
+    const dialog = screen.getByRole("dialog", { name: "Add expense" });
+    const trigger = within(dialog).getByRole("button", {
+      name: "Currency: Hungarian Forint. Change currency",
+    });
+    expect(trigger).toHaveTextContent("Ft");
+    await waitFor(() => expect(screen.getByLabelText("Amount")).toHaveFocus());
+
+    fireEvent.change(screen.getByLabelText("Amount"), {
+      target: { value: "1500" },
+    });
+    fireEvent.change(screen.getByLabelText("Description"), {
+      target: { value: "Lunch" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save expense" }));
+
+    const [payload, callbacks] = createExpense.mock.calls[0];
+    expect(payload).not.toHaveProperty("currency");
+    callbacks.onSuccess?.();
+    expect(toastSuccess).toHaveBeenCalledWith("Expense added", {
+      description: `Lunch · ${formatCurrency(1500, "HUF")}`,
+    });
   });
 
   it("defaults to the first category", () => {

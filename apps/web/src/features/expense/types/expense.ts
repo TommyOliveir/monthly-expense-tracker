@@ -23,6 +23,9 @@ export interface CreateExpensePayload {
   date?: string;
 }
 
+// Only the fields that changed are sent.
+export type UpdateExpensePayload = Partial<CreateExpensePayload>;
+
 export interface ExpenseFilters {
   year?: number;
   month?: number;

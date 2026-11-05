@@ -19,6 +19,7 @@ import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CurrencyCode } from "@/features/currency/currencies";
 import { ExpenseListItem } from "@/features/expense/components/ExpenseListItem";
+import type { ExpenseWithCategory } from "@/features/expense/types/expense";
 import type { ExpenseDayGroup } from "@/features/expense/types/expenseForm";
 
 type ExpenseListProps = {
@@ -27,6 +28,8 @@ type ExpenseListProps = {
   currency: CurrencyCode;
   emptyDescription: string;
   emptyAction?: ReactNode;
+  /** When set, rows open the expense for editing. */
+  onSelectExpense?: (expense: ExpenseWithCategory) => void;
   className?: string;
 };
 
@@ -36,6 +39,7 @@ export function ExpenseList({
   currency,
   emptyDescription,
   emptyAction,
+  onSelectExpense,
   className,
 }: ExpenseListProps) {
   return (
@@ -86,6 +90,7 @@ export function ExpenseList({
                       key={expense.id}
                       expense={expense}
                       currency={currency}
+                      onSelect={onSelectExpense}
                     />
                   ))}
                 </ul>

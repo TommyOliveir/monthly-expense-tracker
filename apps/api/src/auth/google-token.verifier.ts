@@ -13,7 +13,8 @@ export class GoogleTokenVerifier {
   private readonly client = new OAuth2Client();
 
   async verify(idToken: string): Promise<GoogleProfile> {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
+    // Trimmed so a newline pasted into the hosting dashboard can't break the audience check.
+    const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
     if (!clientId) {
       throw new InternalServerErrorException(
         'Google sign-in is not configured',

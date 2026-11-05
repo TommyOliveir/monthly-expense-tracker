@@ -4,6 +4,7 @@ import {
   Expense,
   CreateExpensePayload,
   ExpenseFilters,
+  UpdateExpensePayload,
 } from "@/features/expense/types/expense";
 
 export const expenseQueries = {
@@ -27,12 +28,18 @@ export const expenseQueries = {
       payload,
     );
   },
-  // coming soon
-  // delete: async (id: string): Promise<void> => {
-  //   return await del<void>(
-  //     ENDPOINTS.expenses.delete
-  //       ? ENDPOINTS.expenses.delete(id)
-  //       : `${ENDPOINTS.expenses.list}/${id}`,
-  //   );
-  // },
+
+  update: async (
+    id: string,
+    payload: UpdateExpensePayload,
+  ): Promise<Expense> => {
+    return await patch<Expense, UpdateExpensePayload>(
+      ENDPOINTS.expenses.update(id),
+      payload,
+    );
+  },
+
+  delete: async (id: string): Promise<{ id: string }> => {
+    return await del<{ id: string }>(ENDPOINTS.expenses.delete(id));
+  },
 };
