@@ -19,6 +19,9 @@ import {
 } from "lucide-react";
 import { useLogin } from "@/features/auth/hooks/useLogin";
 import { useSignup } from "@/features/auth/hooks/useSignup";
+import { useGoogleLogin } from "@/features/auth/hooks/useGoogleLogin";
+import { GoogleSignInButton } from "@/features/auth/components/GoogleSignInButton";
+import { GOOGLE_CLIENT_ID } from "@/config";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 
 export function AuthPageContent() {
@@ -37,6 +40,7 @@ export function AuthPageContent() {
 
   const { login } = useLogin();
   const { signup } = useSignup();
+  const { loginWithGoogle } = useGoogleLogin();
 
   // Form State
   const [formData, setFormData] = useState({
@@ -44,7 +48,6 @@ export function AuthPageContent() {
     email: "",
     password: "",
     confirmPassword: "",
-    rememberMe: false,
     agreeTerms: false,
   });
 
@@ -160,8 +163,20 @@ export function AuthPageContent() {
     }
   };
 
-  const handleSocialLogin = (provider: string) => {
-    showNotification(`Initiating secure login via ${provider}...`);
+  const handleGoogleCredential = async (credential: string) => {
+    setIsLoading(true);
+    setSubmitError(null);
+
+    try {
+      const { user } = await loginWithGoogle({ credential });
+      showNotification(`Welcome, ${user.name || user.email}!`);
+      router.push("/tracker");
+    } catch (error) {
+      console.error("Google sign-in failed:", error);
+      setSubmitError(getErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -445,38 +460,32 @@ export function AuthPageContent() {
               </div>
             )}
 
-            <div className="pt-1">
-              <label className="flex items-start gap-2.5 cursor-pointer group select-none">
-                <div className="relative flex items-center mt-0.5">
-                  <input
-                    type="checkbox"
-                    name={authMode === "register" ? "agreeTerms" : "rememberMe"}
-                    checked={
-                      authMode === "register"
-                        ? formData.agreeTerms
-                        : formData.rememberMe
-                    }
-                    onChange={handleInputChange}
-                    className="peer sr-only"
-                  />
-                  <div className="w-4 h-4 rounded border border-[#2c2115]/30 bg-[#faf5ec] peer-checked:bg-[#2c2115] peer-checked:border-[#2c2115] transition-all flex items-center justify-center">
-                    <Check className="w-3 h-3 text-[#faf5ec] opacity-0 peer-checked:opacity-100 transition-opacity" />
+            {authMode === "register" && (
+              <div className="pt-1">
+                <label className="flex items-start gap-2.5 cursor-pointer group select-none">
+                  <div className="relative flex items-center mt-0.5">
+                    <input
+                      type="checkbox"
+                      name="agreeTerms"
+                      checked={formData.agreeTerms}
+                      onChange={handleInputChange}
+                      className="peer sr-only"
+                    />
+                    <div className="w-4 h-4 rounded border border-[#2c2115]/30 bg-[#faf5ec] peer-checked:bg-[#2c2115] peer-checked:border-[#2c2115] transition-all flex items-center justify-center">
+                      <Check className="w-3 h-3 text-[#faf5ec] opacity-0 peer-checked:opacity-100 transition-opacity" />
+                    </div>
                   </div>
-                </div>
-                <span className="text-xs text-[#8a7a63] leading-snug group-hover:text-[#2c2115] transition">
-                  {authMode === "register" ? (
-                    <>I agree to the Terms of Service and Privacy Policy</>
-                  ) : (
-                    "Keep me signed in for 30 days"
-                  )}
-                </span>
-              </label>
-              {authMode === "register" && formErrors.agreeTerms && (
-                <p className="mt-1 text-[11px] text-red-600 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" /> {formErrors.agreeTerms}
-                </p>
-              )}
-            </div>
+                  <span className="text-xs text-[#8a7a63] leading-snug group-hover:text-[#2c2115] transition">
+                    I agree to the Terms of Service and Privacy Policy
+                  </span>
+                </label>
+                {formErrors.agreeTerms && (
+                  <p className="mt-1 text-[11px] text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> {formErrors.agreeTerms}
+                  </p>
+                )}
+              </div>
+            )}
 
             {submitError && (
               <div
@@ -510,33 +519,29 @@ export function AuthPageContent() {
             </div>
           </form>
 
-          <div className="relative mt-7">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#2c2115]/10" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-[#fffdf7] px-3 text-[#8a7a63] uppercase tracking-[0.15em] text-[10px] font-semibold">
-                Or continue with
-              </span>
-            </div>
-          </div>
+          {GOOGLE_CLIENT_ID && (
+            <>
+              <div className="relative mt-7">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[#2c2115]/10" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-[#fffdf7] px-3 text-[#8a7a63] uppercase tracking-[0.15em] text-[10px] font-semibold">
+                    Or continue with
+                  </span>
+                </div>
+              </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => handleSocialLogin("Google")}
-              className="flex items-center justify-center gap-2 rounded-full border border-[#2c2115]/20 px-4 py-2.5 text-xs font-semibold text-[#2c2115] transition hover:bg-[#2c2115]/5"
-            >
-              Google
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSocialLogin("Apple")}
-              className="flex items-center justify-center gap-2 rounded-full border border-[#2c2115]/20 px-4 py-2.5 text-xs font-semibold text-[#2c2115] transition hover:bg-[#2c2115]/5"
-            >
-              Apple
-            </button>
-          </div>
+              <div className="mt-5">
+                <GoogleSignInButton
+                  clientId={GOOGLE_CLIENT_ID}
+                  text={authMode === "register" ? "signup_with" : "signin_with"}
+                  onCredential={handleGoogleCredential}
+                  onError={setSubmitError}
+                />
+              </div>
+            </>
+          )}
 
           <div className="mt-7 rounded-2xl border border-[#2c2115]/10 bg-[#faf5ec] p-4 text-xs text-[#8a7a63]">
             <div className="flex items-center justify-between">

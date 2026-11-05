@@ -14,6 +14,11 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface GoogleLoginPayload {
+  // The ID token Google Identity Services returns to the browser.
+  credential: string;
+}
+
 export interface ILoginResponse extends AuthTokens {
   user: IUser;
 }

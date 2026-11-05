@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import type {
+  GoogleLoginPayload,
   ILoginResponse,
   IUser,
   LoginPayload,
@@ -32,10 +33,28 @@ export type AuthState = {
   isLoading: boolean;
   login: (payload: LoginPayload) => Promise<ILoginResponse>;
   signup: (payload: ISignUpPayload) => Promise<ILoginResponse>;
+  loginWithGoogle: (payload: GoogleLoginPayload) => Promise<ILoginResponse>;
   logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
+
+// Saves a successful login/signup response: tokens go to the token store,
+// the user to localStorage for hydration on the next visit.
+function persistSession(response: ILoginResponse) {
+  setTokens({
+    accessToken: response.accessToken,
+    refreshToken: response.refreshToken ?? null,
+  });
+
+  if (!response.user) return;
+
+  try {
+    localStorage.setItem("user", JSON.stringify(response.user));
+  } catch (e) {
+    console.error("Failed to save user to localStorage:", e);
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<IUser | null>(null);
@@ -93,19 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
 
       if (res?.accessToken) {
-        setTokens({
-          accessToken: res.accessToken,
-          refreshToken: res.refreshToken ?? null,
-        });
-
-        if (res.user) {
-          setUser(res.user);
-          try {
-            localStorage.setItem("user", JSON.stringify(res.user));
-          } catch (e) {
-            console.error("Failed to save user to localStorage:", e);
-          }
-        }
+        persistSession(res);
+        if (res.user) setUser(res.user);
       }
 
       return res;
@@ -141,19 +149,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
 
       if (res?.accessToken) {
-        setTokens({
-          accessToken: res.accessToken,
-          refreshToken: res.refreshToken ?? null,
-        });
+        persistSession(res);
+        if (res.user) setUser(res.user);
+      }
 
-        if (res.user) {
-          setUser(res.user);
-          try {
-            localStorage.setItem("user", JSON.stringify(res.user));
-          } catch (e) {
-            console.error("Failed to save user to localStorage:", e);
-          }
-        }
+      return res;
+    },
+    [],
+  );
+
+  const loginWithGoogle = useCallback(
+    async (payload: GoogleLoginPayload): Promise<ILoginResponse> => {
+      const res = await post<ILoginResponse, GoogleLoginPayload>(
+        ENDPOINTS.auth.google,
+        payload,
+        { requiresAuth: false },
+      );
+
+      if (res?.accessToken) {
+        persistSession(res);
+        if (res.user) setUser(res.user);
       }
 
       return res;
@@ -169,9 +184,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       login,
       signup,
+      loginWithGoogle,
       logout,
     }),
-    [user, accessToken, isLoading, login, signup, logout],
+    [user, accessToken, isLoading, login, signup, loginWithGoogle, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

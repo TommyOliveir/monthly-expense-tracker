@@ -8,6 +8,10 @@ import { CreateUserDto } from '@/user/dto/create-user-dto';
 import { LoginDto } from './dto/login.dto';
 import { hash, verify } from 'argon2';
 import { JwtService } from '@nestjs/jwt';
+import { User } from '@prisma/client';
+import { GoogleTokenVerifier } from './google-token.verifier';
+import { GoogleProfile } from './types/google';
+
 interface JwtPayload {
   sub: string;
   email: string;
@@ -19,7 +23,14 @@ export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
+    private readonly googleTokenVerifier: GoogleTokenVerifier,
   ) {}
+
+  private toPublicUser(user: User) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, refreshTokenHash, googleId, ...publicUser } = user;
+    return publicUser;
+  }
 
   // Helper method to sign both tokens
   private async generateTokens(userId: string, email: string) {
@@ -65,11 +76,9 @@ export class AuthService {
 
     const newUser = await this.userService.create(createUserDto);
     const tokens = await this.generateTokens(newUser.id, newUser.email);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, refreshTokenHash, ...userWithoutSecrets } = newUser;
 
     return {
-      user: userWithoutSecrets,
+      user: this.toPublicUser(newUser),
       ...tokens,
     };
   }
@@ -78,6 +87,11 @@ export class AuthService {
     const user = await this.userService.findByEmail(loginDto.email);
 
     if (!user) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Accounts created through Google sign-in have no password.
+    if (!user.password) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -92,13 +106,46 @@ export class AuthService {
     // ⚠️ CRITICAL MISSING STEP: Hash and save the refresh token to the database
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, refreshTokenHash, ...userWithoutSecrets } = user;
-
     return {
-      user: userWithoutSecrets,
+      user: this.toPublicUser(user),
       ...tokens,
     };
+  }
+
+  async loginWithGoogle(credential: string) {
+    const profile = await this.googleTokenVerifier.verify(credential);
+
+    // Linking by email is only safe when Google vouches for the address.
+    if (!profile.emailVerified) {
+      throw new UnauthorizedException('Google account email is not verified');
+    }
+
+    const user = await this.findOrCreateGoogleUser(profile);
+    const tokens = await this.generateTokens(user.id, user.email);
+    await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
+
+    return {
+      user: this.toPublicUser(user),
+      ...tokens,
+    };
+  }
+
+  private async findOrCreateGoogleUser(profile: GoogleProfile) {
+    const linkedUser = await this.userService.findByGoogleId(profile.googleId);
+    if (linkedUser) {
+      return linkedUser;
+    }
+
+    const existingUser = await this.userService.findByEmail(profile.email);
+    if (existingUser) {
+      return this.userService.update(existingUser.id, {
+        googleId: profile.googleId,
+        // Keep a name the user already set; fill it in only when missing.
+        name: existingUser.name ?? profile.name,
+      });
+    }
+
+    return this.userService.createFromGoogle(profile);
   }
   // auth.service.ts
   async logout(userId: string) {

@@ -15,7 +15,8 @@ model User {
   id        String   @id @default(uuid())
   name      String?  // <--- Add this field (use String? for optional or String for required)
   email     String   @unique
-  password  String
+  password  String?  // null for accounts created through Google sign-in
+  googleId  String?  @unique
   refreshTokenHash String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

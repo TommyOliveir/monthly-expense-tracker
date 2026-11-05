@@ -6,6 +6,7 @@ import { AuthPageContent } from "@/app/login/page";
 const push = vi.fn();
 const login = vi.fn();
 const signup = vi.fn();
+const loginWithGoogle = vi.fn();
 let searchParams = new URLSearchParams();
 
 vi.mock("next/navigation", () => ({
@@ -17,6 +18,22 @@ vi.mock("@/features/auth/hooks/useLogin", () => ({
 }));
 vi.mock("@/features/auth/hooks/useSignup", () => ({
   useSignup: () => ({ signup }),
+}));
+vi.mock("@/features/auth/hooks/useGoogleLogin", () => ({
+  useGoogleLogin: () => ({ loginWithGoogle }),
+}));
+vi.mock("@/config", () => ({ GOOGLE_CLIENT_ID: "test-client-id" }));
+// Stands in for Google's iframe button: clicking it "returns" a credential.
+vi.mock("@/features/auth/components/GoogleSignInButton", () => ({
+  GoogleSignInButton: ({
+    onCredential,
+  }: {
+    onCredential: (credential: string) => void;
+  }) => (
+    <button type="button" onClick={() => onCredential("google-id-token")}>
+      Sign in with Google
+    </button>
+  ),
 }));
 
 function fillLoginForm(email: string, password: string) {
@@ -36,6 +53,7 @@ describe("AuthPageContent", () => {
     push.mockReset();
     login.mockReset();
     signup.mockReset();
+    loginWithGoogle.mockReset();
     searchParams = new URLSearchParams();
   });
 
@@ -134,5 +152,39 @@ describe("AuthPageContent", () => {
     expect(email).toHaveAttribute("autocapitalize", "none");
     expect(password).toHaveAttribute("autocomplete", "current-password");
     expect(password).toHaveAttribute("autocorrect", "off");
+  });
+
+  it("signs in with Google and redirects to the tracker", async () => {
+    loginWithGoogle.mockResolvedValue({
+      user: { id: "user-1", email: "tommy@gmail.com", name: "Tommy" },
+      accessToken: "access",
+      refreshToken: "refresh",
+    });
+    render(<AuthPageContent />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with google/i }),
+    );
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/tracker"));
+    expect(loginWithGoogle).toHaveBeenCalledWith({
+      credential: "google-id-token",
+    });
+  });
+
+  it("shows the API error when Google sign-in is rejected", async () => {
+    loginWithGoogle.mockRejectedValue(
+      new ApiError(401, "Google account email is not verified"),
+    );
+    render(<AuthPageContent />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with google/i }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Google account email is not verified",
+    );
+    expect(push).not.toHaveBeenCalled();
   });
 });

@@ -10,6 +10,7 @@ import {
 import { AuthService } from './auth.service';
 import { CreateUserDto } from '@/user/dto/create-user-dto';
 import { LoginDto } from './dto/login.dto';
+import { GoogleLoginDto } from './dto/google-login.dto';
 import { GetUser } from './decorators/get-user.decorator';
 import { IAuthenticatedUser } from './types/user';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -33,6 +34,12 @@ export class AuthController {
   @Post('login')
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('google')
+  loginWithGoogle(@Body() googleLoginDto: GoogleLoginDto) {
+    return this.authService.loginWithGoogle(googleLoginDto.credential);
   }
 
   @UseGuards(JwtAuthGuard)

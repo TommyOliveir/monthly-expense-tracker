@@ -51,8 +51,8 @@ The husky pre-commit hook runs `lint-staged` (eslint --fix on staged TS in each 
 
 ## Environment
 
-- API: `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `FRONTEND_URL` (added to the CORS allowlist next to `http://localhost:3000`), `PORT`. The JWT secrets fall back to hardcoded dev strings when unset.
-- Web: `NEXT_PUBLIC_API_BASE_URL` (read in `src/config.ts`, typed in `env.d.ts`).
+- API: `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `FRONTEND_URL` (added to the CORS allowlist next to `http://localhost:3000`), `PORT`, `GOOGLE_CLIENT_ID` (audience checked when verifying Google ID tokens; `POST /auth/google` returns 500 without it). The JWT secrets fall back to hardcoded dev strings when unset.
+- Web: `NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (read in `src/config.ts`, typed in `env.d.ts`). The Google button is hidden when the client ID is unset.
 - `apps/api/neon.ts` is Neon branch config: non-default branches get a 7-day TTL.
 
 ## API architecture
@@ -60,7 +60,7 @@ The husky pre-commit hook runs `lint-staged` (eslint --fix on staged TS in each 
 - Feature modules under `src/` (`auth`, `user`, `budget`, `category`, `expense`, `prisma`), each with controller, service, and `dto/` validated by class-validator. The global `ValidationPipe` uses `whitelist` + `forbidNonWhitelisted`, so any request field not declared on the DTO is rejected with a 400.
 - `src/user` is the real user module (Prisma-backed, used by auth). `src/users` is leftover Nest scaffold with in-memory data. Don't extend it.
 - Imports outside the current folder use the `@/` alias (`@/*` → `src/*`, e.g. `from '@/auth/guards/jwt-auth.guard'`), and same-folder imports use `./`. ESLint rejects `../` and `src/...` imports. The alias is defined in `tsconfig.json` and mirrored in Jest's `moduleNameMapper` (in `package.json` for unit tests, `test/jest-e2e.json` for e2e). `nest build` rewrites it to relative paths in `dist/`.
-- Auth: passport-jwt bearer tokens. Protect routes with `@UseGuards(JwtAuthGuard)` and read the caller with `@GetUser('id')` (`src/auth/decorators/get-user.decorator.ts`). Every user-owned query must filter by that `userId`. Login stores an argon2 hash of the refresh token in `users.refreshTokenHash`, and logout clears it. Access tokens currently last 1 day (there is a TODO to shorten this to 15 minutes).
+- Auth: passport-jwt bearer tokens. Protect routes with `@UseGuards(JwtAuthGuard)` and read the caller with `@GetUser('id')` (`src/auth/decorators/get-user.decorator.ts`). Every user-owned query must filter by that `userId`. Google sign-in (`POST /auth/google`) verifies a Google Identity Services ID token, then finds the user by `googleId`, links by verified email, or creates a password-less user. Login stores an argon2 hash of the refresh token in `users.refreshTokenHash`, and logout clears it. Access tokens currently last 1 day (there is a TODO to shorten this to 15 minutes).
 - Swagger UI is served at `/docs`.
 - Data model (`prisma/schema.prisma`): `Budget` is unique per `(userId, year, month)`, and `POST /budget` upserts it. `Expense` stores denormalized `year`/`month` (derived from `date` in `ExpenseService.create`) for the `(userId, year, month)` index, so set them whenever you write `date`. Default categories exist in two forms: global rows from `prisma/seed.ts` (`userId = null`), and per-user copies that `UserService.create` makes at signup (`isDefault = true`, `userId` set). Category listing returns only the user's own rows, so the per-user copies are what users see. Expenses may reference any default, but defaults can't be edited or deleted. Money fields are `Decimal(12,2)`.
 - Prisma agent skills for this project live in `apps/api/.claude/skills/` (symlinked to `.agents/skills/`). The project is on Prisma 6. The `prisma-upgrade-v7` skill describes a migration, not the current setup.

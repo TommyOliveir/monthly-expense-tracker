@@ -6,6 +6,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { ConfigModule } from '@nestjs/config';
+import { GoogleTokenVerifier } from './google-token.verifier';
 @Module({
   imports: [
     UserModule,
@@ -14,7 +15,7 @@ import { ConfigModule } from '@nestjs/config';
     ConfigModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, GoogleTokenVerifier],
   exports: [AuthService, JwtModule, PassportModule],
 })
 export class AuthModule {}
