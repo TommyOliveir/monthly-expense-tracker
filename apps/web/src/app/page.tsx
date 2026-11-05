@@ -169,6 +169,9 @@ export default function LandingPage() {
 
         <footer className="flex items-center justify-between border-t border-[#2c2115]/15 pt-6 text-[11px] uppercase tracking-[0.2em] text-[#8a7a63]">
           <span>IPON Ledger</span>
+          <Link href="/privacy" className="hover:text-[#2c2115]">
+            Privacy
+          </Link>
           <span>Budget first. Wealth follows.</span>
         </footer>
       </div>
