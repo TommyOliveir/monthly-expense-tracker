@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { useLogout } from "@/features/auth/hooks/useLogout";
+import { MobileNavMenu } from "@/components/MobileNavMenu";
 
 const APP_LINKS = [
   { href: "/tracker", label: "Tracker" },
@@ -88,55 +89,55 @@ export default function Navbar() {
         {!isLoading && (
           <div className="flex items-center gap-2">
             {isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      className="size-10 rounded-full bg-brand/15 p-0 font-semibold text-brand-foreground hover:bg-brand/25"
-                      aria-label={`Account menu for ${displayName}`}
-                    />
-                  }
-                >
-                  {displayName.charAt(0).toUpperCase()}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-60">
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel className="flex flex-col gap-0.5 py-1.5">
-                      <span className="truncate text-sm font-medium text-foreground">
-                        {displayName}
-                      </span>
-                      {user?.email && user.name && (
-                        <span className="truncate text-xs font-normal text-muted-foreground">
-                          {user.email}
-                        </span>
-                      )}
-                    </DropdownMenuLabel>
-                  </DropdownMenuGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup className="sm:hidden">
-                    {APP_LINKS.map((link) => (
+              <>
+                <MobileNavMenu
+                  links={APP_LINKS}
+                  pathname={pathname}
+                  displayName={displayName}
+                  email={user?.email}
+                  onLogout={handleLogout}
+                  isLoggingOut={isLoggingOut}
+                />
+                <div className="hidden sm:flex">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          className="size-10 rounded-full bg-brand/15 p-0 font-semibold text-brand-foreground hover:bg-brand/25"
+                          aria-label={`Account menu for ${displayName}`}
+                        />
+                      }
+                    >
+                      {displayName.charAt(0).toUpperCase()}
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-60">
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel className="flex flex-col gap-0.5 py-1.5">
+                          <span className="truncate text-sm font-medium text-foreground">
+                            {displayName}
+                          </span>
+                          {user?.email && user.name && (
+                            <span className="truncate text-xs font-normal text-muted-foreground">
+                              {user.email}
+                            </span>
+                          )}
+                        </DropdownMenuLabel>
+                      </DropdownMenuGroup>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        key={link.href}
+                        variant="destructive"
                         className="h-9"
-                        onClick={() => router.push(link.href)}
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
                       >
-                        {link.label}
+                        <LogOutIcon aria-hidden />
+                        {isLoggingOut ? "Logging out…" : "Log out"}
                       </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuSeparator />
-                  </DropdownMenuGroup>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    className="h-9"
-                    onClick={handleLogout}
-                    disabled={isLoggingOut}
-                  >
-                    <LogOutIcon aria-hidden />
-                    {isLoggingOut ? "Logging out…" : "Log out"}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </>
             ) : (
               <>
                 <Link
