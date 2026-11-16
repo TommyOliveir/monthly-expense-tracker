@@ -3,6 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { UserService } from '@/user/user.service';
 import { CreateUserDto } from '@/user/dto/create-user-dto';
 import { LoginDto } from './dto/login.dto';
@@ -11,59 +12,94 @@ import { JwtService } from '@nestjs/jwt';
 import { User } from '@prisma/client';
 import { GoogleTokenVerifier } from './google-token.verifier';
 import { GoogleProfile } from './types/google';
+import { SessionService } from './session.service';
+import { AuthTokens, RefreshTokenPayload } from './types/token';
 
-interface JwtPayload {
-  sub: string;
-  email: string;
-  iat?: number;
-  exp?: number;
+const ACCESS_TOKEN_TTL = '15m';
+// Sliding window: every refresh pushes expiry out again, so a device stays
+// signed in as long as the app is opened at least once in this period.
+const REFRESH_TOKEN_TTL_DAYS = 30;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+function getAccessSecret(): string {
+  return process.env.JWT_SECRET || 'secretKey';
 }
+
+function getRefreshSecret(): string {
+  return process.env.JWT_REFRESH_SECRET || 'refreshSecretKey';
+}
+
+function getSessionExpiry(): Date {
+  return new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * DAY_IN_MS);
+}
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly googleTokenVerifier: GoogleTokenVerifier,
+    private readonly sessionService: SessionService,
   ) {}
 
   private toPublicUser(user: User) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, refreshTokenHash, googleId, ...publicUser } = user;
+    const { password, googleId, ...publicUser } = user;
     return publicUser;
   }
 
-  // Helper method to sign both tokens
-  private async generateTokens(userId: string, email: string) {
-    const payload = { sub: userId, email };
-
+  private async generateTokens(
+    userId: string,
+    email: string,
+    sessionId: string,
+  ): Promise<AuthTokens> {
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        secret: process.env.JWT_SECRET || 'secretKey',
-        // expiresIn: '15m',// Short-lived access token put this back with working on refersh token
-        expiresIn: '1d',
-      }),
-      this.jwtService.signAsync(payload, {
-        secret: process.env.JWT_REFRESH_SECRET || 'refreshSecretKey',
-        expiresIn: '7d', // Long-lived refresh token
-      }),
+      this.jwtService.signAsync(
+        { sub: userId, email },
+        { secret: getAccessSecret(), expiresIn: ACCESS_TOKEN_TTL },
+      ),
+      this.jwtService.signAsync(
+        { sub: userId, email, sid: sessionId },
+        {
+          secret: getRefreshSecret(),
+          expiresIn: `${REFRESH_TOKEN_TTL_DAYS}d`,
+        },
+      ),
     ]);
 
-    return {
-      accessToken,
-      refreshToken,
-    };
+    return { accessToken, refreshToken };
   }
 
-  // 2. CREATE THE HELPER METHOD HERE
-  private async updateRefreshTokenHash(
-    userId: string,
-    refreshToken: string | null,
-  ) {
-    // If refreshToken is provided, hash it. If null (during logout), keep it null.
-    const refreshTokenHash = refreshToken ? await hash(refreshToken) : null;
+  // Each login (or signup) is a new device session with its own refresh token.
+  private async startSession(user: User): Promise<AuthTokens> {
+    const sessionId = randomUUID();
+    const tokens = await this.generateTokens(user.id, user.email, sessionId);
 
-    // Call the update method in your UserService
-    await this.userService.update(userId, { refreshTokenHash });
+    await this.sessionService.deleteExpiredForUser(user.id);
+    await this.sessionService.create({
+      id: sessionId,
+      userId: user.id,
+      refreshTokenHash: await hash(tokens.refreshToken),
+      expiresAt: getSessionExpiry(),
+    });
+
+    return tokens;
+  }
+
+  private async verifyRefreshToken(
+    refreshToken: string,
+    options: { ignoreExpiration?: boolean } = {},
+  ): Promise<RefreshTokenPayload | null> {
+    try {
+      const payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
+        refreshToken,
+        { secret: getRefreshSecret(), ...options },
+      );
+      // Tokens issued before sessions existed have no `sid`.
+      return payload.sid ? payload : null;
+    } catch {
+      return null;
+    }
   }
 
   async registerUser(createUserDto: CreateUserDto) {
@@ -75,7 +111,7 @@ export class AuthService {
     }
 
     const newUser = await this.userService.create(createUserDto);
-    const tokens = await this.generateTokens(newUser.id, newUser.email);
+    const tokens = await this.startSession(newUser);
 
     return {
       user: this.toPublicUser(newUser),
@@ -101,10 +137,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const tokens = await this.generateTokens(user.id, user.email);
-
-    // ⚠️ CRITICAL MISSING STEP: Hash and save the refresh token to the database
-    await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
+    const tokens = await this.startSession(user);
 
     return {
       user: this.toPublicUser(user),
@@ -121,8 +154,7 @@ export class AuthService {
     }
 
     const user = await this.findOrCreateGoogleUser(profile);
-    const tokens = await this.generateTokens(user.id, user.email);
-    await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
+    const tokens = await this.startSession(user);
 
     return {
       user: this.toPublicUser(user),
@@ -147,34 +179,56 @@ export class AuthService {
 
     return this.userService.createFromGoogle(profile);
   }
-  // auth.service.ts
-  async logout(userId: string) {
-    // Clear the stored refresh token hash in database
-    await this.userService.update(userId, { refreshTokenHash: null });
+
+  // Ends only the session this refresh token belongs to; other devices stay
+  // signed in. An expired token still identifies its session, so it is
+  // accepted here. Unknown tokens are ignored: the device is logged out anyway.
+  async logout(refreshToken: string) {
+    const payload = await this.verifyRefreshToken(refreshToken, {
+      ignoreExpiration: true,
+    });
+
+    if (payload) {
+      await this.sessionService.deleteForUser(payload.sid, payload.sub);
+    }
 
     return { message: 'Logged out successfully' };
   }
 
-  async refreshTokens(refreshToken: string) {
-    try {
-      // 1. Verify refresh token signature & expiration
-      const payload = await this.jwtService.verifyAsync<JwtPayload>(
-        refreshToken,
-        {
-          secret: process.env.JWT_REFRESH_SECRET || 'refreshSecretKey',
-        },
-      );
-
-      // 2. Fetch fresh user data
-      const user = await this.userService.findByEmail(payload.email);
-      if (!user) {
-        throw new UnauthorizedException('Access Denied');
-      }
-
-      // 3. Issue fresh tokens
-      return await this.generateTokens(user.id, user.email);
-    } catch {
+  async refreshTokens(refreshToken: string): Promise<AuthTokens> {
+    const payload = await this.verifyRefreshToken(refreshToken);
+    if (!payload) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+
+    const session = await this.sessionService.findById(payload.sid);
+    const isUsable =
+      session !== null &&
+      session.userId === payload.sub &&
+      session.expiresAt > new Date() &&
+      (await verify(session.refreshTokenHash, refreshToken));
+
+    if (!isUsable) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    const tokens = await this.generateTokens(
+      payload.sub,
+      payload.email,
+      payload.sid,
+    );
+    const rotated = await this.sessionService.rotate({
+      id: session.id,
+      currentHash: session.refreshTokenHash,
+      nextHash: await hash(tokens.refreshToken),
+      expiresAt: getSessionExpiry(),
+    });
+
+    if (!rotated) {
+      // Another refresh with this same token won the race.
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    return tokens;
   }
 }

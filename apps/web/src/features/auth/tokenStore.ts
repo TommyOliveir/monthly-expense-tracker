@@ -30,28 +30,44 @@ function removeStorage(): void {
   }
 }
 
-function getInitialTokens(): AuthTokens | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const storedToken = readStorage();
-
-  if (!storedToken) {
+function parseTokens(rawValue: string | null): AuthTokens | null {
+  if (!rawValue) {
     return null;
   }
 
   try {
-    return JSON.parse(storedToken) as AuthTokens;
+    const parsed = JSON.parse(rawValue) as Partial<AuthTokens>;
+    // A session without an access token can't authenticate anything.
+    return parsed.accessToken ? (parsed as AuthTokens) : null;
   } catch {
     removeStorage();
     return null;
   }
 }
 
+function getInitialTokens(): AuthTokens | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return parseTokens(readStorage());
+}
+
 let tokens: AuthTokens | null = getInitialTokens();
 
 const listeners = new Set<TokenListener>();
+
+function applyTokens(newTokens: AuthTokens | null): void {
+  if (areTokensEqual(tokens, newTokens)) {
+    return;
+  }
+
+  tokens = newTokens;
+
+  listeners.forEach((listener) => {
+    listener(tokens);
+  });
+}
 
 function areTokensEqual(
   first: AuthTokens | null,
@@ -73,25 +89,18 @@ if (typeof window !== "undefined") {
       return;
     }
 
-    let newTokens: AuthTokens | null = null;
-
-    if (event.newValue) {
-      try {
-        newTokens = JSON.parse(event.newValue) as AuthTokens;
-      } catch {
-        removeStorage();
-        newTokens = null;
-      }
-    }
-
-    if (!areTokensEqual(tokens, newTokens)) {
-      tokens = newTokens;
-
-      listeners.forEach((listener) => {
-        listener(tokens);
-      });
-    }
+    applyTokens(parseTokens(event.newValue));
   });
+}
+
+// Picks up tokens another tab just saved. The `storage` event is async, so a
+// tab that waited for another tab's refresh calls this to see the result now.
+export function syncTokensFromStorage(): AuthTokens | null {
+  if (typeof window !== "undefined") {
+    applyTokens(parseTokens(readStorage()));
+  }
+
+  return tokens;
 }
 
 export function getTokens(): AuthTokens | null {

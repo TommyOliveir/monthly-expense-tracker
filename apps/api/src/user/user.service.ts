@@ -61,7 +61,7 @@ export class UserService {
     });
   }
 
-  // 2. Generic update method (used to update refreshTokenHash, profile, etc.)
+  // 2. Generic update method (profile fields, Google account linking, etc.)
   async update(id: string, data: Prisma.UserUpdateInput) {
     return this.prisma.user.update({
       where: { id },

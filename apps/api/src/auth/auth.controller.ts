@@ -11,6 +11,7 @@ import { AuthService } from './auth.service';
 import { CreateUserDto } from '@/user/dto/create-user-dto';
 import { LoginDto } from './dto/login.dto';
 import { GoogleLoginDto } from './dto/google-login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { GetUser } from './decorators/get-user.decorator';
 import { IAuthenticatedUser } from './types/user';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -19,7 +20,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  //use for auth me
+  // Returns the caller decoded from the access token.
+  @UseGuards(JwtAuthGuard)
   @Get('profile')
   getProfile(@GetUser() user: IAuthenticatedUser) {
     return user;
@@ -42,16 +44,17 @@ export class AuthController {
     return this.authService.loginWithGoogle(googleLoginDto.credential);
   }
 
-  @UseGuards(JwtAuthGuard)
+  // Public: the refresh token identifies the device session to end, so logout
+  // still works after the access token has expired.
   @HttpCode(HttpStatus.OK)
   @Post('logout')
-  async logout(@GetUser('id') userId: string) {
-    return this.authService.logout(userId);
+  logout(@Body() { refresh_token }: RefreshTokenDto) {
+    return this.authService.logout(refresh_token);
   }
 
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
-  refresh(@Body('refresh_token') refreshToken: string) {
-    return this.authService.refreshTokens(refreshToken);
+  refresh(@Body() { refresh_token }: RefreshTokenDto) {
+    return this.authService.refreshTokens(refresh_token);
   }
 }

@@ -1,15 +1,13 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
-import { User } from '@prisma/client';
+import { Session, User } from '@prisma/client';
+import { hash } from 'argon2';
 import { UserService } from '@/user/user.service';
 import { AuthService } from './auth.service';
 import { GoogleTokenVerifier } from './google-token.verifier';
+import { SessionService } from './session.service';
 import { GoogleProfile } from './types/google';
-
-// @nestjs/jwt ships ESM that Jest's CommonJS runtime can't parse, and the
-// service only needs the class as an injection token here.
-jest.mock('@nestjs/jwt', () => ({ JwtService: class JwtService {} }));
 
 const googleProfile: GoogleProfile = {
   googleId: 'google-123',
@@ -25,12 +23,29 @@ function buildUser(overrides: Partial<User> = {}): User {
     email: 'tommy@gmail.com',
     password: 'hashed-password',
     googleId: null,
-    refreshTokenHash: null,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
     ...overrides,
   };
 }
+
+function buildSession(overrides: Partial<Session> = {}): Session {
+  return {
+    id: 'session-1',
+    userId: 'user-1',
+    refreshTokenHash: 'stored-hash',
+    expiresAt: new Date(Date.now() + 60_000),
+    createdAt: new Date('2026-01-01'),
+    updatedAt: new Date('2026-01-01'),
+    ...overrides,
+  };
+}
+
+const refreshPayload = {
+  sub: 'user-1',
+  email: 'tommy@gmail.com',
+  sid: 'session-1',
+};
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -41,7 +56,14 @@ describe('AuthService', () => {
     update: jest.fn(),
   };
   const googleTokenVerifier = { verify: jest.fn() };
-  const jwtService = { signAsync: jest.fn() };
+  const jwtService = { signAsync: jest.fn(), verifyAsync: jest.fn() };
+  const sessionService = {
+    create: jest.fn(),
+    findById: jest.fn(),
+    rotate: jest.fn(),
+    deleteForUser: jest.fn(),
+    deleteExpiredForUser: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.resetAllMocks();
@@ -56,6 +78,7 @@ describe('AuthService', () => {
         { provide: UserService, useValue: userService },
         { provide: GoogleTokenVerifier, useValue: googleTokenVerifier },
         { provide: JwtService, useValue: jwtService },
+        { provide: SessionService, useValue: sessionService },
       ],
     }).compile();
 
@@ -78,7 +101,6 @@ describe('AuthService', () => {
       );
       expect(result.user).not.toHaveProperty('password');
       expect(result.user).not.toHaveProperty('googleId');
-      expect(result.user).not.toHaveProperty('refreshTokenHash');
       expect(userService.findByEmail).not.toHaveBeenCalled();
       expect(userService.createFromGoogle).not.toHaveBeenCalled();
     });
@@ -109,10 +131,10 @@ describe('AuthService', () => {
 
       expect(userService.createFromGoogle).toHaveBeenCalledWith(googleProfile);
       expect(result.user.id).toBe('user-2');
-      // The refresh token hash is stored, the same as a password login.
-      expect(userService.update).toHaveBeenCalledWith('user-2', {
-        refreshTokenHash: expect.any(String) as string,
-      });
+      // A device session is stored, the same as a password login.
+      expect(sessionService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-2' }),
+      );
     });
 
     it('rejects a Google account whose email is not verified', async () => {
@@ -138,6 +160,131 @@ describe('AuthService', () => {
       await expect(
         service.login({ email: 'tommy@gmail.com', password: 'anything' }),
       ).rejects.toThrow('Invalid email or password');
+    });
+  });
+
+  describe('sessions', () => {
+    it('starts a new session per login, with the session id in the refresh token', async () => {
+      googleTokenVerifier.verify.mockResolvedValue(googleProfile);
+      userService.findByGoogleId.mockResolvedValue(buildUser());
+
+      await service.loginWithGoogle('id-token');
+
+      const [{ id: sessionId, refreshTokenHash }] = sessionService.create.mock
+        .calls[0] as [{ id: string; refreshTokenHash: string }];
+      expect(refreshTokenHash).not.toBe('signed-token');
+      expect(jwtService.signAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ sub: 'user-1', sid: sessionId }),
+        expect.anything(),
+      );
+      expect(sessionService.deleteExpiredForUser).toHaveBeenCalledWith(
+        'user-1',
+      );
+    });
+  });
+
+  describe('refreshTokens', () => {
+    beforeEach(() => {
+      jwtService.verifyAsync.mockResolvedValue(refreshPayload);
+    });
+
+    it('rotates the session and returns new tokens', async () => {
+      const storedHash = await hash('old-refresh-token');
+      sessionService.findById.mockResolvedValue(
+        buildSession({ refreshTokenHash: storedHash }),
+      );
+      sessionService.rotate.mockResolvedValue(true);
+
+      const tokens = await service.refreshTokens('old-refresh-token');
+
+      expect(tokens).toEqual({
+        accessToken: 'signed-token',
+        refreshToken: 'signed-token',
+      });
+      expect(sessionService.rotate).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'session-1', currentHash: storedHash }),
+      );
+    });
+
+    it('rejects a token that is not the current one for its session', async () => {
+      sessionService.findById.mockResolvedValue(
+        buildSession({ refreshTokenHash: await hash('newer-refresh-token') }),
+      );
+
+      await expect(
+        service.refreshTokens('old-refresh-token'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(sessionService.rotate).not.toHaveBeenCalled();
+    });
+
+    it('rejects a token whose session was logged out', async () => {
+      sessionService.findById.mockResolvedValue(null);
+
+      await expect(
+        service.refreshTokens('old-refresh-token'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rejects an expired session', async () => {
+      sessionService.findById.mockResolvedValue(
+        buildSession({
+          refreshTokenHash: await hash('old-refresh-token'),
+          expiresAt: new Date(Date.now() - 1000),
+        }),
+      );
+
+      await expect(
+        service.refreshTokens('old-refresh-token'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rejects a token issued before sessions existed', async () => {
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: 'user-1',
+        email: 'tommy@gmail.com',
+      });
+
+      await expect(
+        service.refreshTokens('legacy-refresh-token'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(sessionService.findById).not.toHaveBeenCalled();
+    });
+
+    it('rejects the loser of two concurrent refreshes', async () => {
+      sessionService.findById.mockResolvedValue(
+        buildSession({ refreshTokenHash: await hash('old-refresh-token') }),
+      );
+      sessionService.rotate.mockResolvedValue(false);
+
+      await expect(
+        service.refreshTokens('old-refresh-token'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+  });
+
+  describe('logout', () => {
+    it('ends only the session the refresh token belongs to', async () => {
+      jwtService.verifyAsync.mockResolvedValue(refreshPayload);
+
+      await service.logout('refresh-token');
+
+      expect(jwtService.verifyAsync).toHaveBeenCalledWith(
+        'refresh-token',
+        expect.objectContaining({ ignoreExpiration: true }),
+      );
+      expect(sessionService.deleteForUser).toHaveBeenCalledWith(
+        'session-1',
+        'user-1',
+      );
+    });
+
+    it('succeeds without touching sessions for an invalid token', async () => {
+      jwtService.verifyAsync.mockRejectedValue(new Error('invalid signature'));
+
+      await expect(service.logout('garbage')).resolves.toEqual({
+        message: 'Logged out successfully',
+      });
+      expect(sessionService.deleteForUser).not.toHaveBeenCalled();
     });
   });
 });

@@ -17,15 +17,32 @@ model User {
   email     String   @unique
   password  String?  // null for accounts created through Google sign-in
   googleId  String?  @unique
-  refreshTokenHash String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   budgets    Budget[]
   expenses   Expense[]
   categories Category[]
+  sessions   Session[]
 
   @@map("users")
+}
+
+// One row per signed-in device, so logging in on a phone doesn't sign out the
+// laptop. The refresh token carries the session id (`sid`) and is rotated on
+// every refresh; only the hash of the current one is stored.
+model Session {
+  id               String   @id @default(uuid())
+  refreshTokenHash String
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
 }
 model Budget {
   id        String   @id @default(uuid())

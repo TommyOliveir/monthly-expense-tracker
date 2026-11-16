@@ -20,5 +20,9 @@
 
   "[json]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
+  },
+
+  // The API is on Prisma 6; the extension's default Prisma 7 language server
+  // flags `datasource.url`, which Prisma 6 still requires.
+  "prisma.pinToPrisma6": true
 }

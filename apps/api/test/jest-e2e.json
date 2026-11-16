@@ -7,6 +7,15 @@
     "^@/(.*)$": "<rootDir>/src/$1"
   },
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
-  }
+    "^.+\\.ts$": "ts-jest",
+    "^.+\\.js$": [
+      "babel-jest",
+      {
+        "plugins": ["@babel/plugin-transform-modules-commonjs"]
+      }
+    ]
+  },
+  "transformIgnorePatterns": [
+    "/node_modules/(?!@nestjs/(config|jwt|passport)/)"
+  ]
 }

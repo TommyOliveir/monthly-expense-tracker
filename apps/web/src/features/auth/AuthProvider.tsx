@@ -15,6 +15,7 @@ import type {
   ILoginResponse,
   IUser,
   LoginPayload,
+  LogoutPayload,
   ISignUpPayload,
 } from "./types/auth";
 import { post } from "@/api/client";
@@ -121,11 +122,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // Updated Logout handler
   const logout = useCallback(async () => {
+    const refreshToken = getTokens()?.refreshToken;
+
     try {
-      // 1. Fire request to backend to invalidate refreshTokenHash in DB
-      await post(ENDPOINTS.auth.logout, {}, { requiresAuth: true });
+      // 1. End this device's session on the server; other devices stay signed in.
+      if (refreshToken) {
+        await post<unknown, LogoutPayload>(
+          ENDPOINTS.auth.logout,
+          { refresh_token: refreshToken },
+          { requiresAuth: false },
+        );
+      }
     } catch (error) {
       console.error("Logout request failed on server:", error);
     } finally {

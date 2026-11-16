@@ -14,6 +14,10 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface LogoutPayload {
+  refresh_token: string;
+}
+
 export interface GoogleLoginPayload {
   // The ID token Google Identity Services returns to the browser.
   credential: string;

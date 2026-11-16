@@ -5,7 +5,7 @@ export const ENDPOINTS = {
     google: "/auth/google",
     logout: "/auth/logout",
     refresh: "/auth/refresh",
-    me: "/auth/me",
+    me: "/auth/profile",
   },
   budget: {
     summary: "/budget/summary",

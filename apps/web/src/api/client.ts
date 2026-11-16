@@ -1,7 +1,12 @@
 import { API_BASE_URL } from "@/config";
 import { HTTP_STATUS } from "./httpCode";
 import { ENDPOINTS } from "./endpoints";
-import { clearTokens, getTokens, setTokens } from "@/features/auth/tokenStore";
+import {
+  clearTokens,
+  getTokens,
+  setTokens,
+  syncTokensFromStorage,
+} from "@/features/auth/tokenStore";
 import { AuthTokens } from "@/features/auth/types/auth";
 
 type RequestOptions = RequestInit & {
@@ -30,6 +35,9 @@ export class ApiError extends Error {
     this.name = "ApiError";
   }
 }
+
+// Shared by every tab of the app, so only one of them refreshes at a time.
+const REFRESH_LOCK_NAME = "ipon-auth-refresh";
 
 let refreshPromise: Promise<AuthTokens> | null = null;
 
@@ -103,44 +111,72 @@ async function performTokenRefresh(): Promise<AuthTokens> {
     );
   }
 
-  const data: {
-    access_token: string;
-    refresh_token: string;
-  } = await response.json();
+  const newTokens: AuthTokens = await response.json();
 
-  const newTokens: AuthTokens = {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-  };
+  if (!newTokens?.accessToken || !newTokens.refreshToken) {
+    throw new ApiError(
+      HTTP_STATUS.UNAUTHORIZED,
+      "Refresh response is missing tokens",
+    );
+  }
 
   setTokens(newTokens);
 
   return newTokens;
 }
 
+// Refresh tokens are single-use, so two tabs refreshing with the same one
+// would sign each other out. The Web Locks API queues them across tabs; where
+// it's missing, the in-tab dedup in refreshAccessToken still applies.
+async function withRefreshLock(
+  task: () => Promise<AuthTokens>,
+): Promise<AuthTokens> {
+  if (typeof navigator === "undefined" || !navigator.locks) {
+    return task();
+  }
+
+  return await navigator.locks.request(REFRESH_LOCK_NAME, task);
+}
+
+// Only a rejection from the server means the session is over. A network error
+// (offline phone, flaky connection) must keep the tokens for the next try.
+function isSessionRejected(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.status === HTTP_STATUS.UNAUTHORIZED ||
+      error.status === HTTP_STATUS.FORBIDDEN ||
+      error.status === HTTP_STATUS.BAD_REQUEST)
+  );
+}
+
 async function refreshAccessToken(
   usedAccessToken: string | null,
 ): Promise<AuthTokens> {
-  const currentAccessToken = getTokens()?.accessToken ?? null;
-
-  if (
-    usedAccessToken &&
-    currentAccessToken &&
-    currentAccessToken !== usedAccessToken
-  ) {
-    return getTokens()!;
-  }
-
   if (refreshPromise) {
     return refreshPromise;
   }
 
-  refreshPromise = performTokenRefresh();
+  refreshPromise = withRefreshLock(() => {
+    // Another tab may have refreshed while this one waited for the lock.
+    const currentTokens = syncTokensFromStorage();
+
+    if (
+      usedAccessToken &&
+      currentTokens?.accessToken &&
+      currentTokens.accessToken !== usedAccessToken
+    ) {
+      return Promise.resolve(currentTokens);
+    }
+
+    return performTokenRefresh();
+  });
 
   try {
     return await refreshPromise;
   } catch (error) {
-    clearTokens();
+    if (isSessionRejected(error)) {
+      clearTokens();
+    }
     throw error;
   } finally {
     refreshPromise = null;
