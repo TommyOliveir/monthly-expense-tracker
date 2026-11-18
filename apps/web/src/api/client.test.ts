@@ -3,8 +3,27 @@ import { ApiError, get } from "@/api/client";
 import { ENDPOINTS } from "@/api/endpoints";
 import { clearTokens, getTokens, setTokens } from "@/features/auth/tokenStore";
 
-const OLD_TOKENS = { accessToken: "old-access", refreshToken: "old-refresh" };
-const NEW_TOKENS = { accessToken: "new-access", refreshToken: "new-refresh" };
+// A JWT-shaped token whose `exp` is `expiresInSeconds` from now. The client
+// only reads `exp`; the signature is never checked on this side.
+function fakeAccessToken(name: string, expiresInSeconds: number): string {
+  const encode = (value: Record<string, unknown>) =>
+    btoa(JSON.stringify(value)).replace(/=+$/, "");
+  const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
+
+  return `${encode({ alg: "HS256" })}.${encode({ sub: name, exp })}.sig`;
+}
+
+// Still valid by its own `exp`, so these tests reach the API and get a 401
+// there (as when the server rejects a token the phone thinks is fine).
+const OLD_TOKENS = {
+  accessToken: fakeAccessToken("old", 600),
+  refreshToken: "old-refresh",
+};
+const NEW_TOKENS = {
+  accessToken: fakeAccessToken("new", 900),
+  refreshToken: "new-refresh",
+};
+const NEW_AUTH_HEADER = `Bearer ${NEW_TOKENS.accessToken}`;
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -39,7 +58,7 @@ describe("api client token refresh", () => {
   it("refreshes an expired access token and retries the request", async () => {
     fetchMock.mockImplementation(async (input, init) => {
       if (isRefreshCall(String(input))) return jsonResponse(200, NEW_TOKENS);
-      return getAuthHeader(init) === "Bearer new-access"
+      return getAuthHeader(init) === NEW_AUTH_HEADER
         ? jsonResponse(200, { total: 5 })
         : jsonResponse(401, { message: "Unauthorized" });
     });
@@ -52,10 +71,29 @@ describe("api client token refresh", () => {
     );
   });
 
+  it("refreshes before sending when the stored token has already expired", async () => {
+    setTokens({
+      accessToken: fakeAccessToken("expired", -60),
+      refreshToken: "old-refresh",
+    });
+    fetchMock.mockImplementation(async (input, init) => {
+      if (isRefreshCall(String(input))) return jsonResponse(200, NEW_TOKENS);
+      return getAuthHeader(init) === NEW_AUTH_HEADER
+        ? jsonResponse(200, { total: 5 })
+        : jsonResponse(401, { message: "Unauthorized" });
+    });
+
+    await expect(get(ENDPOINTS.budget.summary)).resolves.toEqual({ total: 5 });
+
+    // Refresh first, then one successful request: no wasted 401.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(isRefreshCall(String(fetchMock.mock.calls[0][0]))).toBe(true);
+  });
+
   it("shares one refresh between concurrent requests", async () => {
     fetchMock.mockImplementation(async (input, init) => {
       if (isRefreshCall(String(input))) return jsonResponse(200, NEW_TOKENS);
-      return getAuthHeader(init) === "Bearer new-access"
+      return getAuthHeader(init) === NEW_AUTH_HEADER
         ? jsonResponse(200, [])
         : jsonResponse(401, { message: "Unauthorized" });
     });
@@ -78,7 +116,7 @@ describe("api client token refresh", () => {
           message: "Invalid or expired refresh token",
         });
       }
-      if (getAuthHeader(init) === "Bearer new-access") {
+      if (getAuthHeader(init) === NEW_AUTH_HEADER) {
         return jsonResponse(200, []);
       }
       // Another tab rotates the tokens while this request is in flight.

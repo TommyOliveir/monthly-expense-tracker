@@ -7,6 +7,7 @@ export function useBudgetSummary(params: BudgetSummaryParams) {
   const {
     data: budgetSummary,
     isPending: isBudgetSummaryLoading,
+    isFetching: isBudgetSummaryFetching,
     error: budgetSummaryError,
     refetch: refetchBudgetSummary,
   } = useQuery({
@@ -17,6 +18,7 @@ export function useBudgetSummary(params: BudgetSummaryParams) {
   return {
     budgetSummary,
     isBudgetSummaryLoading,
+    isBudgetSummaryFetching,
     budgetSummaryError,
     refetchBudgetSummary,
   };

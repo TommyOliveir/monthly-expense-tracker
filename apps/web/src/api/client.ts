@@ -8,6 +8,7 @@ import {
   syncTokensFromStorage,
 } from "@/features/auth/tokenStore";
 import { AuthTokens } from "@/features/auth/types/auth";
+import { isAccessTokenExpired } from "@/features/auth/utils/isAccessTokenExpired";
 
 type RequestOptions = RequestInit & {
   requiresAuth?: boolean;
@@ -40,6 +41,9 @@ export class ApiError extends Error {
 const REFRESH_LOCK_NAME = "ipon-auth-refresh";
 
 let refreshPromise: Promise<AuthTokens> | null = null;
+// The access token this tab got from its latest refresh. It's never refreshed
+// early again, so a phone whose clock runs ahead can't refresh on every request.
+let lastRefreshedAccessToken: string | null = null;
 
 async function requestOnce<T>(
   url: string,
@@ -121,6 +125,7 @@ async function performTokenRefresh(): Promise<AuthTokens> {
   }
 
   setTokens(newTokens);
+  lastRefreshedAccessToken = newTokens.accessToken;
 
   return newTokens;
 }
@@ -183,8 +188,23 @@ async function refreshAccessToken(
   }
 }
 
+// After a break the stored access token has usually expired (it lasts 15 min).
+// Sending it anyway only earns a 401, so refresh first and save a round trip.
+function shouldRefreshBeforeRequest(accessToken: string | undefined): boolean {
+  return (
+    accessToken !== undefined &&
+    accessToken !== lastRefreshedAccessToken &&
+    isAccessTokenExpired(accessToken)
+  );
+}
+
 async function request<T>(url: string, options?: RequestOptions): Promise<T> {
   const requiresAuth = options?.requiresAuth !== false;
+  const storedAccessToken = getTokens()?.accessToken;
+
+  if (requiresAuth && shouldRefreshBeforeRequest(storedAccessToken)) {
+    await refreshAccessToken(storedAccessToken ?? null);
+  }
 
   try {
     return await requestOnce<T>(url, options);

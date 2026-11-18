@@ -7,12 +7,13 @@ import { randomUUID } from 'node:crypto';
 import { UserService } from '@/user/user.service';
 import { CreateUserDto } from '@/user/dto/create-user-dto';
 import { LoginDto } from './dto/login.dto';
-import { hash, verify } from 'argon2';
+import { verify } from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 import { User } from '@prisma/client';
 import { GoogleTokenVerifier } from './google-token.verifier';
 import { GoogleProfile } from './types/google';
 import { SessionService } from './session.service';
+import { hashRefreshToken, refreshTokenMatches } from './refresh-token-hash';
 import { AuthTokens, RefreshTokenPayload } from './types/token';
 
 const ACCESS_TOKEN_TTL = '15m';
@@ -79,7 +80,7 @@ export class AuthService {
     await this.sessionService.create({
       id: sessionId,
       userId: user.id,
-      refreshTokenHash: await hash(tokens.refreshToken),
+      refreshTokenHash: hashRefreshToken(tokens.refreshToken),
       expiresAt: getSessionExpiry(),
     });
 
@@ -206,7 +207,7 @@ export class AuthService {
       session !== null &&
       session.userId === payload.sub &&
       session.expiresAt > new Date() &&
-      (await verify(session.refreshTokenHash, refreshToken));
+      (await refreshTokenMatches(session.refreshTokenHash, refreshToken));
 
     if (!isUsable) {
       throw new UnauthorizedException('Invalid or expired refresh token');
@@ -220,7 +221,7 @@ export class AuthService {
     const rotated = await this.sessionService.rotate({
       id: session.id,
       currentHash: session.refreshTokenHash,
-      nextHash: await hash(tokens.refreshToken),
+      nextHash: hashRefreshToken(tokens.refreshToken),
       expiresAt: getSessionExpiry(),
     });
 

@@ -14,6 +14,10 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true, // Allows authorization headers / cookies
     allowedHeaders: ['Content-Type', 'Authorization'],
+    // Requests with an Authorization header need a preflight. Letting browsers
+    // cache it (they clamp this to their own maximum) saves a round trip on
+    // most API calls; without it they redo the preflight after ~5 seconds.
+    maxAge: 86400,
   });
 
   // Validation
@@ -37,7 +41,7 @@ async function bootstrap() {
 
   SwaggerModule.setup('docs', app, document);
 
-  // Railway needs PORT + 0.0.0.0
+  // Render needs PORT + 0.0.0.0
   const port = process.env.PORT ?? 3001;
 
   await app.listen(port, '0.0.0.0');

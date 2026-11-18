@@ -1,6 +1,7 @@
 import { LockIcon, PlusIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import type { CurrencyCode } from "@/features/currency/currencies";
 import { CurrencyPicker } from "@/features/currency/components/CurrencyPicker";
 import { MonthSwitcher } from "@/features/tracker/components/MonthSwitcher";
@@ -10,6 +11,7 @@ type TrackerHeaderProps = {
   monthLabel: string;
   isCurrentMonth: boolean;
   isReadOnly: boolean;
+  isSyncing?: boolean;
   currency: CurrencyCode;
   onCurrencyChange: (currency: CurrencyCode) => void;
   onPreviousMonth: () => void;
@@ -23,6 +25,7 @@ export function TrackerHeader({
   monthLabel,
   isCurrentMonth,
   isReadOnly,
+  isSyncing = false,
   currency,
   onCurrencyChange,
   onPreviousMonth,
@@ -33,9 +36,18 @@ export function TrackerHeader({
   return (
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <p className="text-sm text-muted-foreground">
-          {firstName ? `Hi, ${firstName}` : "Your monthly ledger"}
-        </p>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <p>{firstName ? `Hi, ${firstName}` : "Your monthly ledger"}</p>
+          {isSyncing && (
+            <span
+              role="status"
+              className="inline-flex items-center gap-1 text-xs"
+            >
+              <Spinner aria-hidden className="size-3" />
+              Updating…
+            </span>
+          )}
+        </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-3">
           <h1 className="font-display text-3xl font-medium tracking-tight sm:text-4xl">
             {monthLabel}

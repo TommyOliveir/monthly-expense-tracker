@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import type {
   GoogleLoginPayload,
@@ -20,6 +21,7 @@ import type {
 } from "./types/auth";
 import { post } from "@/api/client";
 import { ENDPOINTS } from "@/api/endpoints";
+import { removePersistedQueryCache } from "@/providers/queryCacheStorage";
 import {
   clearTokens,
   getTokens,
@@ -61,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<IUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     // 1. Subscribe to token changes
@@ -69,8 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!newTokens) {
         setUser(null);
+        // The session ended (logout or rejected refresh): drop this user's
+        // cached data, in memory and on disk, before anyone else signs in.
+        queryClient.clear();
         try {
           localStorage.removeItem("user");
+          removePersistedQueryCache();
         } catch {
           // Ignore storage restrictions
         }
@@ -101,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelAnimationFrame(frameId);
       unsubscribe();
     };
-  }, []);
+  }, [queryClient]);
 
   // Login handler
   const login = useCallback(

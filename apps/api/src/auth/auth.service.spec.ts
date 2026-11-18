@@ -7,6 +7,7 @@ import { UserService } from '@/user/user.service';
 import { AuthService } from './auth.service';
 import { GoogleTokenVerifier } from './google-token.verifier';
 import { SessionService } from './session.service';
+import { hashRefreshToken } from './refresh-token-hash';
 import { GoogleProfile } from './types/google';
 
 const googleProfile: GoogleProfile = {
@@ -172,7 +173,7 @@ describe('AuthService', () => {
 
       const [{ id: sessionId, refreshTokenHash }] = sessionService.create.mock
         .calls[0] as [{ id: string; refreshTokenHash: string }];
-      expect(refreshTokenHash).not.toBe('signed-token');
+      expect(refreshTokenHash).toBe(hashRefreshToken('signed-token'));
       expect(jwtService.signAsync).toHaveBeenCalledWith(
         expect.objectContaining({ sub: 'user-1', sid: sessionId }),
         expect.anything(),
@@ -189,7 +190,7 @@ describe('AuthService', () => {
     });
 
     it('rotates the session and returns new tokens', async () => {
-      const storedHash = await hash('old-refresh-token');
+      const storedHash = hashRefreshToken('old-refresh-token');
       sessionService.findById.mockResolvedValue(
         buildSession({ refreshTokenHash: storedHash }),
       );
@@ -206,9 +207,28 @@ describe('AuthService', () => {
       );
     });
 
+    it('accepts a session hashed with argon2 once and moves it to SHA-256', async () => {
+      const legacyHash = await hash('old-refresh-token');
+      sessionService.findById.mockResolvedValue(
+        buildSession({ refreshTokenHash: legacyHash }),
+      );
+      sessionService.rotate.mockResolvedValue(true);
+
+      await service.refreshTokens('old-refresh-token');
+
+      expect(sessionService.rotate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          currentHash: legacyHash,
+          nextHash: hashRefreshToken('signed-token'),
+        }),
+      );
+    });
+
     it('rejects a token that is not the current one for its session', async () => {
       sessionService.findById.mockResolvedValue(
-        buildSession({ refreshTokenHash: await hash('newer-refresh-token') }),
+        buildSession({
+          refreshTokenHash: hashRefreshToken('newer-refresh-token'),
+        }),
       );
 
       await expect(
@@ -228,7 +248,7 @@ describe('AuthService', () => {
     it('rejects an expired session', async () => {
       sessionService.findById.mockResolvedValue(
         buildSession({
-          refreshTokenHash: await hash('old-refresh-token'),
+          refreshTokenHash: hashRefreshToken('old-refresh-token'),
           expiresAt: new Date(Date.now() - 1000),
         }),
       );
@@ -252,7 +272,9 @@ describe('AuthService', () => {
 
     it('rejects the loser of two concurrent refreshes', async () => {
       sessionService.findById.mockResolvedValue(
-        buildSession({ refreshTokenHash: await hash('old-refresh-token') }),
+        buildSession({
+          refreshTokenHash: hashRefreshToken('old-refresh-token'),
+        }),
       );
       sessionService.rotate.mockResolvedValue(false);
 

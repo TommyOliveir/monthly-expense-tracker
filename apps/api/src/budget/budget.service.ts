@@ -88,29 +88,30 @@ export class BudgetService {
     const numericYear = Number(year);
     const numericMonth = Number(month);
 
-    // 1. Fetch Budget target for the month
-    const budget = await this.prisma.budget.findFirst({
-      where: {
-        userId,
-        year: numericYear,
-        month: numericMonth,
-      },
-    });
-
-    // 2. Fetch all Expenses
-    const expenses = await this.prisma.expense.findMany({
-      where: {
-        userId,
-        year: numericYear,
-        month: numericMonth,
-      },
-      include: {
-        category: true,
-      },
-      orderBy: {
-        date: 'desc',
-      },
-    });
+    // The budget target and the month's expenses don't depend on each other,
+    // so fetch them in parallel: one database round trip instead of two.
+    const [budget, expenses] = await Promise.all([
+      this.prisma.budget.findFirst({
+        where: {
+          userId,
+          year: numericYear,
+          month: numericMonth,
+        },
+      }),
+      this.prisma.expense.findMany({
+        where: {
+          userId,
+          year: numericYear,
+          month: numericMonth,
+        },
+        include: {
+          category: true,
+        },
+        orderBy: {
+          date: 'desc',
+        },
+      }),
+    ]);
 
     const totalSpent = expenses.reduce(
       (sum, expense) => sum + Number(expense.amount),

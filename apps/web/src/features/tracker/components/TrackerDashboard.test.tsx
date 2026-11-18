@@ -11,6 +11,7 @@ const CURRENT_MONTH: YearMonth = { year: 2026, month: 11 };
 type BudgetSummaryState = {
   budgetSummary?: IBudgetSummary;
   isBudgetSummaryLoading: boolean;
+  isBudgetSummaryFetching: boolean;
   budgetSummaryError: Error | null;
   refetchBudgetSummary: () => void;
 };
@@ -65,6 +66,7 @@ describe("TrackerDashboard", () => {
     budgetState = {
       budgetSummary: undefined,
       isBudgetSummaryLoading: false,
+      isBudgetSummaryFetching: false,
       budgetSummaryError: null,
       refetchBudgetSummary: vi.fn(),
     };
@@ -77,6 +79,25 @@ describe("TrackerDashboard", () => {
     );
 
     expect(screen.getByRole("status")).toHaveTextContent("Loading your month…");
+  });
+
+  it("marks cached data as updating while a newer copy loads", () => {
+    budgetState.budgetSummary = makeSummary({ budget: 1000 });
+    budgetState.isBudgetSummaryFetching = true;
+    render(
+      <TrackerDashboard currency="USD" onCurrencyChange={onCurrencyChange} />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("Updating…");
+  });
+
+  it("hides the updating label once the data is fresh", () => {
+    budgetState.budgetSummary = makeSummary({ budget: 1000 });
+    render(
+      <TrackerDashboard currency="USD" onCurrencyChange={onCurrencyChange} />,
+    );
+
+    expect(screen.queryByText("Updating…")).not.toBeInTheDocument();
   });
 
   it("shows an error with a retry when the month fails to load", () => {

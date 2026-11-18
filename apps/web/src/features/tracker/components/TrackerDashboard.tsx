@@ -50,6 +50,7 @@ export function TrackerDashboard({
   const {
     budgetSummary,
     isBudgetSummaryLoading,
+    isBudgetSummaryFetching,
     budgetSummaryError,
     refetchBudgetSummary,
   } = useBudgetSummary(selectedMonth);
@@ -179,6 +180,9 @@ export function TrackerDashboard({
         monthLabel={monthLabel}
         isCurrentMonth={monthComparison === 0}
         isReadOnly={isReadOnly}
+        // Data is on screen (e.g. restored from the cache) but a newer copy
+        // is still loading, which can take a while when the API is waking up.
+        isSyncing={isBudgetSummaryFetching && budgetSummary !== undefined}
         currency={currency}
         onCurrencyChange={onCurrencyChange}
         onPreviousMonth={() =>
