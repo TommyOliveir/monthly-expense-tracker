@@ -12,7 +12,11 @@ import {
 
 // Bump when a cached response shape changes, so old caches are dropped.
 const QUERY_CACHE_VERSION = "1";
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+// How long saved data is shown on open. Matches the refresh token's 30-day
+// sliding lifetime (REFRESH_TOKEN_TTL_DAYS in the API): after that long away
+// you have to log in again anyway. A shorter window meant anyone who skipped
+// a day saw the skeleton for the whole Render cold start (~1 minute).
+const CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export default function QueryProvider({
   children,
@@ -28,7 +32,7 @@ export default function QueryProvider({
             staleTime: 60 * 1000, // 1 minute stale time
             // Kept as long as the persisted cache, so restored data isn't
             // garbage-collected before the screen that needs it mounts.
-            gcTime: ONE_DAY_MS,
+            gcTime: CACHE_MAX_AGE_MS,
             refetchOnWindowFocus: false,
           },
         },
@@ -49,7 +53,7 @@ export default function QueryProvider({
       client={queryClient}
       persistOptions={{
         persister,
-        maxAge: ONE_DAY_MS,
+        maxAge: CACHE_MAX_AGE_MS,
         buster: QUERY_CACHE_VERSION,
       }}
     >

@@ -38,6 +38,7 @@ function readPersistedCache(): string | null {
 }
 
 const neverResolves = () => new Promise<string>(() => {});
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe("QueryProvider persistence", () => {
   beforeEach(() => {
@@ -71,6 +72,36 @@ describe("QueryProvider persistence", () => {
 
     expect(await screen.findByText("₱1,000 budget")).toBeInTheDocument();
   });
+
+  it.each([
+    { label: "2 days", days: 2, shown: "₱1,000 budget" },
+    { label: "29 days", days: 29, shown: "₱1,000 budget" },
+    // Past the 30-day session lifetime the copy is dropped.
+    { label: "31 days", days: 31, shown: "loading" },
+  ])(
+    "after $label away, shows $shown while the API wakes up",
+    async ({ days, shown }) => {
+      const firstOpen = render(
+        <QueryProvider>
+          <Summary queryFn={() => Promise.resolve("₱1,000 budget")} />
+        </QueryProvider>,
+      );
+      await waitFor(() => expect(readPersistedCache()).toContain("₱1,000"), {
+        timeout: 3000,
+      });
+      firstOpen.unmount();
+
+      const savedAt = Date.now();
+      vi.spyOn(Date, "now").mockReturnValue(savedAt + days * DAY_MS);
+      render(
+        <QueryProvider>
+          <Summary queryFn={neverResolves} />
+        </QueryProvider>,
+      );
+
+      expect(await screen.findByText(shown)).toBeInTheDocument();
+    },
+  );
 
   it("wipes cached data, in memory and on disk, when the session ends", async () => {
     let queryClient: QueryClient | undefined;

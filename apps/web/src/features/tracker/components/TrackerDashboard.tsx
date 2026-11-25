@@ -1,13 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CircleAlertIcon, PlusIcon } from "lucide-react";
-import {
-  Alert,
-  AlertAction,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
+import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatMonthLabel, formatPercent } from "@/lib/format";
 import { getErrorMessage } from "@/lib/getErrorMessage";
@@ -30,6 +24,7 @@ import { ExpenseList } from "@/features/expense/components/ExpenseList";
 import type { ExpenseWithCategory } from "@/features/expense/types/expense";
 import { groupExpensesByDay } from "@/features/expense/utils/groupExpensesByDay";
 import { AddExpenseBar } from "@/features/tracker/components/AddExpenseBar";
+import { RetryAlert } from "@/features/tracker/components/RetryAlert";
 import { StatCard } from "@/features/tracker/components/StatCard";
 import { TrackerHeader } from "@/features/tracker/components/TrackerHeader";
 import { TrackerContentSkeleton } from "@/features/tracker/components/TrackerSkeleton";
@@ -85,91 +80,95 @@ export function TrackerDashboard({
   const remaining = budgetSummary?.remaining ?? budget - totalSpent;
   const topCategory = breakdown[0];
 
+  const hasSummary = budgetSummary !== undefined;
+
   const openExpenseDialog = () => setIsExpenseDialogOpen(true);
 
   const renderContent = () => {
     if (isBudgetSummaryLoading) return <TrackerContentSkeleton />;
 
-    if (budgetSummaryError) {
+    // Nothing to show at all: the error takes the whole content area.
+    if (budgetSummaryError && !hasSummary) {
       return (
-        <Alert variant="destructive" className="px-4 py-3">
-          <CircleAlertIcon aria-hidden />
-          <AlertTitle>Couldn&apos;t load {monthLabel}</AlertTitle>
-          <AlertDescription>
-            {getErrorMessage(budgetSummaryError)}
-          </AlertDescription>
-          <AlertAction className="top-2.5 right-3">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => refetchBudgetSummary()}
-            >
-              Try again
-            </Button>
-          </AlertAction>
-        </Alert>
+        <RetryAlert
+          variant="destructive"
+          title={`Couldn't load ${monthLabel}`}
+          description={getErrorMessage(budgetSummaryError)}
+          onRetry={() => refetchBudgetSummary()}
+        />
       );
     }
 
     return (
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-12">
-        <BudgetOverviewCard
-          className="lg:col-span-8"
-          budget={budget}
-          totalSpent={totalSpent}
-          remaining={remaining}
-          status={getBudgetStatus(budget, totalSpent)}
-          currency={currency}
-          monthLabel={monthLabel}
-          isReadOnly={isReadOnly}
-          onEditBudget={() => setIsBudgetDialogOpen(true)}
-        />
-
-        <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:col-span-4 lg:grid-cols-1">
-          <StatCard
-            label="Spent"
-            value={formatCurrency(totalSpent, currency)}
-            hint={`${expenses.length} ${expenses.length === 1 ? "expense" : "expenses"}`}
+      <>
+        {/* A failed refresh must not hide the saved data already on screen. */}
+        {budgetSummaryError && (
+          <RetryAlert
+            variant="default"
+            title="Couldn't refresh. Showing your saved data."
+            description={getErrorMessage(budgetSummaryError)}
+            onRetry={() => refetchBudgetSummary()}
           />
-          <StatCard
-            label="Top category"
-            value={topCategory?.name ?? "—"}
-            hint={
-              topCategory
-                ? `${formatPercent(topCategory.share)} of spending`
-                : "No spending yet"
+        )}
+        <div className="grid gap-4 sm:gap-6 lg:grid-cols-12">
+          <BudgetOverviewCard
+            className="lg:col-span-8"
+            budget={budget}
+            totalSpent={totalSpent}
+            remaining={remaining}
+            status={getBudgetStatus(budget, totalSpent)}
+            currency={currency}
+            monthLabel={monthLabel}
+            isReadOnly={isReadOnly}
+            onEditBudget={() => setIsBudgetDialogOpen(true)}
+          />
+
+          <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:col-span-4 lg:grid-cols-1">
+            <StatCard
+              label="Spent"
+              value={formatCurrency(totalSpent, currency)}
+              hint={`${expenses.length} ${expenses.length === 1 ? "expense" : "expenses"}`}
+            />
+            <StatCard
+              label="Top category"
+              value={topCategory?.name ?? "—"}
+              hint={
+                topCategory
+                  ? `${formatPercent(topCategory.share)} of spending`
+                  : "No spending yet"
+              }
+            />
+          </div>
+
+          <CategoryBreakdown
+            className="self-start lg:sticky lg:top-24 lg:col-span-4 lg:col-start-9 lg:row-start-2"
+            items={breakdown}
+            currency={currency}
+          />
+
+          <ExpenseList
+            className="lg:col-span-8 lg:col-start-1 lg:row-start-2"
+            groups={dayGroups}
+            expenseCount={expenses.length}
+            currency={currency}
+            emptyDescription={
+              isReadOnly
+                ? `Nothing was recorded in ${monthLabel}.`
+                : "Add your first expense to start tracking this month."
+            }
+            // Past months are a fixed record, like adding: no edit or delete.
+            onSelectExpense={isReadOnly ? undefined : setEditingExpense}
+            emptyAction={
+              isReadOnly ? undefined : (
+                <Button className="h-10 px-4" onClick={openExpenseDialog}>
+                  <PlusIcon aria-hidden />
+                  Add expense
+                </Button>
+              )
             }
           />
         </div>
-
-        <CategoryBreakdown
-          className="self-start lg:sticky lg:top-24 lg:col-span-4 lg:col-start-9 lg:row-start-2"
-          items={breakdown}
-          currency={currency}
-        />
-
-        <ExpenseList
-          className="lg:col-span-8 lg:col-start-1 lg:row-start-2"
-          groups={dayGroups}
-          expenseCount={expenses.length}
-          currency={currency}
-          emptyDescription={
-            isReadOnly
-              ? `Nothing was recorded in ${monthLabel}.`
-              : "Add your first expense to start tracking this month."
-          }
-          // Past months are a fixed record, like adding: no edit or delete.
-          onSelectExpense={isReadOnly ? undefined : setEditingExpense}
-          emptyAction={
-            isReadOnly ? undefined : (
-              <Button className="h-10 px-4" onClick={openExpenseDialog}>
-                <PlusIcon aria-hidden />
-                Add expense
-              </Button>
-            )
-          }
-        />
-      </div>
+      </>
     );
   };
 
@@ -182,7 +181,7 @@ export function TrackerDashboard({
         isReadOnly={isReadOnly}
         // Data is on screen (e.g. restored from the cache) but a newer copy
         // is still loading, which can take a while when the API is waking up.
-        isSyncing={isBudgetSummaryFetching && budgetSummary !== undefined}
+        isSyncing={isBudgetSummaryFetching && hasSummary}
         currency={currency}
         onCurrencyChange={onCurrencyChange}
         onPreviousMonth={() =>

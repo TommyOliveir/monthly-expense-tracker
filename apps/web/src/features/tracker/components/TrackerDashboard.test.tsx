@@ -100,6 +100,29 @@ describe("TrackerDashboard", () => {
     expect(screen.queryByText("Updating…")).not.toBeInTheDocument();
   });
 
+  it("keeps saved data on screen when a refresh fails", () => {
+    budgetState.budgetSummary = makeSummary({
+      budget: 1000,
+      totalSpent: 300,
+      remaining: 700,
+      expenses: [makeExpense({ id: "1", name: "Groceries", amount: 300 })],
+    });
+    budgetState.budgetSummaryError = new ApiError(500, "boom");
+    render(
+      <TrackerDashboard currency="USD" onCurrencyChange={onCurrencyChange} />,
+    );
+
+    expect(screen.getByText("Groceries")).toBeInTheDocument();
+    expect(
+      screen.getByText("Couldn't refresh. Showing your saved data."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Couldn't load November 2026"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(budgetState.refetchBudgetSummary).toHaveBeenCalled();
+  });
+
   it("shows an error with a retry when the month fails to load", () => {
     budgetState.budgetSummaryError = new ApiError(500, "boom");
     render(
