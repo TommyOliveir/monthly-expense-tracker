@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { GoogleTokenVerifier } from './google-token.verifier';
 import { SessionService } from './session.service';
 import { hashRefreshToken } from './refresh-token-hash';
+import { JWT_SECRETS, JwtSecrets } from './jwt-secrets';
 import { GoogleProfile } from './types/google';
 
 const googleProfile: GoogleProfile = {
@@ -58,6 +59,10 @@ describe('AuthService', () => {
   };
   const googleTokenVerifier = { verify: jest.fn() };
   const jwtService = { signAsync: jest.fn(), verifyAsync: jest.fn() };
+  const secrets: JwtSecrets = {
+    accessSecret: 'test-access-secret',
+    refreshSecret: 'test-refresh-secret',
+  };
   const sessionService = {
     create: jest.fn(),
     findById: jest.fn(),
@@ -80,6 +85,7 @@ describe('AuthService', () => {
         { provide: GoogleTokenVerifier, useValue: googleTokenVerifier },
         { provide: JwtService, useValue: jwtService },
         { provide: SessionService, useValue: sessionService },
+        { provide: JWT_SECRETS, useValue: secrets },
       ],
     }).compile();
 
@@ -165,7 +171,7 @@ describe('AuthService', () => {
   });
 
   describe('sessions', () => {
-    it('starts a new session per login, with the session id in the refresh token', async () => {
+    it('starts a new session per login, with the session id in both tokens', async () => {
       googleTokenVerifier.verify.mockResolvedValue(googleProfile);
       userService.findByGoogleId.mockResolvedValue(buildUser());
 
@@ -175,8 +181,22 @@ describe('AuthService', () => {
         .calls[0] as [{ id: string; refreshTokenHash: string }];
       expect(refreshTokenHash).toBe(hashRefreshToken('signed-token'));
       expect(jwtService.signAsync).toHaveBeenCalledWith(
-        expect.objectContaining({ sub: 'user-1', sid: sessionId }),
-        expect.anything(),
+        {
+          sub: 'user-1',
+          email: 'tommy@gmail.com',
+          sid: sessionId,
+          type: 'access',
+        },
+        expect.objectContaining({ secret: 'test-access-secret' }),
+      );
+      expect(jwtService.signAsync).toHaveBeenCalledWith(
+        {
+          sub: 'user-1',
+          email: 'tommy@gmail.com',
+          sid: sessionId,
+          type: 'refresh',
+        },
+        expect.objectContaining({ secret: 'test-refresh-secret' }),
       );
       expect(sessionService.deleteExpiredForUser).toHaveBeenCalledWith(
         'user-1',
@@ -256,6 +276,34 @@ describe('AuthService', () => {
       await expect(
         service.refreshTokens('old-refresh-token'),
       ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rejects an access token sent as a refresh token', async () => {
+      jwtService.verifyAsync.mockResolvedValue({
+        ...refreshPayload,
+        type: 'access',
+      });
+
+      await expect(
+        service.refreshTokens('access-token'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(sessionService.findById).not.toHaveBeenCalled();
+    });
+
+    it('verifies refresh tokens with the refresh secret', async () => {
+      sessionService.findById.mockResolvedValue(
+        buildSession({
+          refreshTokenHash: hashRefreshToken('old-refresh-token'),
+        }),
+      );
+      sessionService.rotate.mockResolvedValue(true);
+
+      await service.refreshTokens('old-refresh-token');
+
+      expect(jwtService.verifyAsync).toHaveBeenCalledWith(
+        'old-refresh-token',
+        expect.objectContaining({ secret: 'test-refresh-secret' }),
+      );
     });
 
     it('rejects a token issued before sessions existed', async () => {

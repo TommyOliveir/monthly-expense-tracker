@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -15,20 +16,13 @@ import { GoogleProfile } from './types/google';
 import { SessionService } from './session.service';
 import { hashRefreshToken, refreshTokenMatches } from './refresh-token-hash';
 import { AuthTokens, RefreshTokenPayload } from './types/token';
+import { JWT_SECRETS, JwtSecrets } from './jwt-secrets';
 
 const ACCESS_TOKEN_TTL = '15m';
 // Sliding window: every refresh pushes expiry out again, so a device stays
 // signed in as long as the app is opened at least once in this period.
 const REFRESH_TOKEN_TTL_DAYS = 30;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-
-function getAccessSecret(): string {
-  return process.env.JWT_SECRET || 'secretKey';
-}
-
-function getRefreshSecret(): string {
-  return process.env.JWT_REFRESH_SECRET || 'refreshSecretKey';
-}
 
 function getSessionExpiry(): Date {
   return new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * DAY_IN_MS);
@@ -41,6 +35,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly googleTokenVerifier: GoogleTokenVerifier,
     private readonly sessionService: SessionService,
+    @Inject(JWT_SECRETS) private readonly secrets: JwtSecrets,
   ) {}
 
   private toPublicUser(user: User) {
@@ -55,14 +50,16 @@ export class AuthService {
     sessionId: string,
   ): Promise<AuthTokens> {
     const [accessToken, refreshToken] = await Promise.all([
+      // `sid` lets every request check that the session still exists, so a
+      // logout or deleted account ends access at once, not after 15 minutes.
       this.jwtService.signAsync(
-        { sub: userId, email },
-        { secret: getAccessSecret(), expiresIn: ACCESS_TOKEN_TTL },
+        { sub: userId, email, sid: sessionId, type: 'access' },
+        { secret: this.secrets.accessSecret, expiresIn: ACCESS_TOKEN_TTL },
       ),
       this.jwtService.signAsync(
-        { sub: userId, email, sid: sessionId },
+        { sub: userId, email, sid: sessionId, type: 'refresh' },
         {
-          secret: getRefreshSecret(),
+          secret: this.secrets.refreshSecret,
           expiresIn: `${REFRESH_TOKEN_TTL_DAYS}d`,
         },
       ),
@@ -94,10 +91,12 @@ export class AuthService {
     try {
       const payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
         refreshToken,
-        { secret: getRefreshSecret(), ...options },
+        { secret: this.secrets.refreshSecret, ...options },
       );
-      // Tokens issued before sessions existed have no `sid`.
-      return payload.sid ? payload : null;
+      // Tokens issued before sessions existed have no `sid`; `type` is checked
+      // only when present, as refresh tokens issued before it existed lack it.
+      const isRefreshToken = !payload.type || payload.type === 'refresh';
+      return payload.sid && isRefreshToken ? payload : null;
     } catch {
       return null;
     }

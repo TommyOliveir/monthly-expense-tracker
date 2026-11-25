@@ -8,6 +8,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { ConfigModule } from '@nestjs/config';
 import { GoogleTokenVerifier } from './google-token.verifier';
 import { SessionService } from './session.service';
+import { JWT_SECRETS, loadJwtSecrets } from './jwt-secrets';
 @Module({
   imports: [
     UserModule,
@@ -16,7 +17,15 @@ import { SessionService } from './session.service';
     ConfigModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, GoogleTokenVerifier, SessionService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    GoogleTokenVerifier,
+    SessionService,
+    // Throws during startup when a secret is missing, so the API never boots
+    // with a guessable signing key.
+    { provide: JWT_SECRETS, useFactory: () => loadJwtSecrets() },
+  ],
   exports: [AuthService, JwtModule, PassportModule],
 })
 export class AuthModule {}
