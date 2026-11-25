@@ -103,6 +103,37 @@ describe("QueryProvider persistence", () => {
     },
   );
 
+  it("keeps data in memory and on disk when you leave the tracker and come back", async () => {
+    const fetchSummary = vi.fn(() => Promise.resolve("₱1,000 budget"));
+    const view = render(
+      <QueryProvider>
+        <Summary queryFn={fetchSummary} />
+      </QueryProvider>,
+    );
+    expect(await screen.findByText("₱1,000 budget")).toBeInTheDocument();
+
+    for (let trip = 0; trip < 3; trip++) {
+      // Like opening /about: the tracker's query has no observer for a while.
+      view.rerender(
+        <QueryProvider>
+          <p>about</p>
+        </QueryProvider>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      view.rerender(
+        <QueryProvider>
+          <Summary queryFn={fetchSummary} />
+        </QueryProvider>,
+      );
+      expect(screen.getByText("₱1,000 budget")).toBeInTheDocument();
+    }
+
+    expect(fetchSummary).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(readPersistedCache()).toContain("₱1,000"), {
+      timeout: 3000,
+    });
+  });
+
   it("wipes cached data, in memory and on disk, when the session ends", async () => {
     let queryClient: QueryClient | undefined;
     render(

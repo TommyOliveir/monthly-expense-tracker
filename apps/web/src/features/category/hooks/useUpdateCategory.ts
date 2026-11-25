@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { budgetKeys } from "@/features/budget/queries/budgetKeys";
 import { categoryKeys } from "@/features/category/queries/categoryKeys";
 import { categoryQueries } from "@/features/category/queries/categoryQueries";
 import { UpdateCategoryPayload } from "@/features/category/types/category";
@@ -25,6 +26,9 @@ export function useUpdateCategory() {
       queryClient.invalidateQueries({
         queryKey: categoryKeys.all,
       });
+      // The budget summary embeds each expense's category (name, colour), so
+      // it would keep showing the old values until its cache went stale.
+      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
     },
   });
 

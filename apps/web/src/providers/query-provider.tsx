@@ -17,6 +17,7 @@ const QUERY_CACHE_VERSION = "1";
 // you have to log in again anyway. A shorter window meant anyone who skipped
 // a day saw the skeleton for the whole Render cold start (~1 minute).
 const CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const STALE_TIME_MS = 5 * 60 * 1000;
 
 export default function QueryProvider({
   children,
@@ -29,10 +30,17 @@ export default function QueryProvider({
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 60 * 1000, // 1 minute stale time
-            // Kept as long as the persisted cache, so restored data isn't
-            // garbage-collected before the screen that needs it mounts.
-            gcTime: CACHE_MAX_AGE_MS,
+            // Cached data counts as fresh for 5 minutes, so moving between
+            // pages doesn't refetch. Safe because every mutation invalidates
+            // the keys it changes; this only bounds how long an edit made on
+            // another device takes to show up here.
+            staleTime: STALE_TIME_MS,
+            // Never garbage-collect: unused data stays in memory (and so in the
+            // saved copy) until logout clears it. This can't be CACHE_MAX_AGE_MS:
+            // timers above 2^31-1 ms (~24.8 days) fire after ~1 ms instead, so
+            // leaving the tracker deleted its data and returning refetched.
+            // The 30-day limit is enforced on restore by `maxAge` below.
+            gcTime: Infinity,
             refetchOnWindowFocus: false,
           },
         },
