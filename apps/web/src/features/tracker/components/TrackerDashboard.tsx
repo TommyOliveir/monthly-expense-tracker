@@ -27,7 +27,7 @@ import { AddExpenseBar } from "@/features/tracker/components/AddExpenseBar";
 import { RetryAlert } from "@/features/tracker/components/RetryAlert";
 import { StatCard } from "@/features/tracker/components/StatCard";
 import { TrackerHeader } from "@/features/tracker/components/TrackerHeader";
-import { TrackerContentSkeleton } from "@/features/tracker/components/TrackerSkeleton";
+import { TrackerContentLoading } from "@/features/tracker/components/TrackerContentLoading";
 import { useSelectedMonth } from "@/features/tracker/hooks/useSelectedMonth";
 
 type TrackerDashboardProps = {
@@ -85,7 +85,7 @@ export function TrackerDashboard({
   const openExpenseDialog = () => setIsExpenseDialogOpen(true);
 
   const renderContent = () => {
-    if (isBudgetSummaryLoading) return <TrackerContentSkeleton />;
+    if (isBudgetSummaryLoading) return <TrackerContentLoading />;
 
     // Nothing to show at all: the error takes the whole content area.
     if (budgetSummaryError && !hasSummary) {

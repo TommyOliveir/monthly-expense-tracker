@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import type { YearMonth } from "@/lib/yearMonth";
 import type { IBudgetSummary } from "@/features/budget/types/budget";
 import { TrackerDashboard } from "@/features/tracker/components/TrackerDashboard";
+import { SLOW_LOAD_HINT_DELAY_MS } from "@/features/tracker/components/TrackerContentLoading";
 import { makeCategory, makeExpense } from "@/test/fixtures";
 
 const CURRENT_MONTH: YearMonth = { year: 2026, month: 11 };
@@ -79,6 +80,26 @@ describe("TrackerDashboard", () => {
     );
 
     expect(screen.getByRole("status")).toHaveTextContent("Loading your month…");
+  });
+
+  it("explains a slow first load as the server waking up", () => {
+    vi.useFakeTimers();
+    try {
+      budgetState.isBudgetSummaryLoading = true;
+      render(
+        <TrackerDashboard currency="USD" onCurrencyChange={onCurrencyChange} />,
+      );
+      // A warm API answers well before the hint appears.
+      expect(screen.queryByText(/Waking up the server/)).toBeNull();
+
+      act(() => vi.advanceTimersByTime(SLOW_LOAD_HINT_DELAY_MS));
+
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Waking up the server",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("marks cached data as updating while a newer copy loads", () => {

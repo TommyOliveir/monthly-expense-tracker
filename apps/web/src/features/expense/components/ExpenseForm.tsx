@@ -89,6 +89,8 @@ export function ExpenseForm({
 }: ExpenseFormProps) {
   const amountInputRef = useRef<HTMLInputElement>(null);
   const isBusy = isSubmitting || isDeleting;
+  const areCategoriesUnavailable =
+    isCategoriesLoading || Boolean(categoriesError);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -160,6 +162,9 @@ export function ExpenseForm({
                 size="sm"
                 className="h-auto px-0 text-brand-foreground"
                 onClick={onManageCategories}
+                // Without the list, the dialog would wrongly say you have no
+                // categories of your own.
+                disabled={areCategoriesUnavailable}
               >
                 <Settings2Icon aria-hidden />
                 Manage
@@ -170,7 +175,7 @@ export function ExpenseForm({
               categories={categories}
               value={values.categoryId}
               onValueChange={(categoryId) => onChange("categoryId", categoryId)}
-              disabled={isCategoriesLoading || Boolean(categoriesError)}
+              disabled={areCategoriesUnavailable}
               invalid={Boolean(errors.categoryId)}
               describedBy={
                 errors.categoryId ? getErrorId("categoryId") : undefined

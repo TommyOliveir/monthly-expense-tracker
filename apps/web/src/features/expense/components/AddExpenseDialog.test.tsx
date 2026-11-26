@@ -332,4 +332,26 @@ describe("AddExpenseDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(onRetryCategories).toHaveBeenCalled();
   });
+
+  it.each([
+    { label: "fail to load", isCategoriesLoading: false, error: "Offline." },
+    { label: "are loading", isCategoriesLoading: true, error: null },
+  ])(
+    "can't open Manage categories while categories $label",
+    ({ isCategoriesLoading, error }) => {
+      renderDialog({
+        categories: [],
+        isCategoriesLoading,
+        categoriesError: error,
+      });
+
+      expect(screen.getByRole("button", { name: "Manage" })).toBeDisabled();
+    },
+  );
+
+  it("opens Manage categories once categories are loaded", () => {
+    renderDialog();
+
+    expect(screen.getByRole("button", { name: "Manage" })).toBeEnabled();
+  });
 });

@@ -1,9 +1,21 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 
-export function TrackerContentSkeleton() {
+type TrackerContentSkeletonProps = {
+  /** Visible note above the placeholders, e.g. when loading is slow. */
+  hint?: string;
+};
+
+export function TrackerContentSkeleton({ hint }: TrackerContentSkeletonProps) {
   return (
     <div role="status" className="grid gap-4 sm:gap-6 lg:grid-cols-12">
       <span className="sr-only">Loading your month…</span>
+      {hint && (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground lg:col-span-12">
+          <Spinner aria-hidden className="size-3.5 shrink-0" />
+          {hint}
+        </p>
+      )}
       <Skeleton className="h-48 rounded-xl lg:col-span-8" />
       <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:col-span-4 lg:grid-cols-1">
         <Skeleton className="h-24 rounded-xl" />
